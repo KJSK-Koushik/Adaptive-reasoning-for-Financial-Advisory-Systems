@@ -48,3 +48,7 @@ desktop.ini
 # Large regenerable result bundles
 phase3_results.zip
 *.zip
+
+# Course/report deliverables (kept locally, not tracked)
+*.pptx
+*.docx
