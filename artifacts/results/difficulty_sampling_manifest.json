@@ -1,0 +1,9 @@
+{
+  "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+  "k_samples": 3,
+  "temperature": 0.7,
+  "max_new_tokens": 512,
+  "numeric_tolerance": 0.01,
+  "n_questions": 12,
+  "n_generations": 36
+}

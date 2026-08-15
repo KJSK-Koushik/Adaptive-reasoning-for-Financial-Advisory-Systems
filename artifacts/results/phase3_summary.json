@@ -1,0 +1,10 @@
+{
+  "n_traces": 4000,
+  "final_accuracy": 0.4243,
+  "mean_total_tokens": 532.8,
+  "mean_steps": 11.46,
+  "solvable_fraction": 0.633,
+  "oracle_mean_tokens": 187.9,
+  "oracle_token_saving_pct": 64.1,
+  "mean_earliest_correct_step": 2.92
+}

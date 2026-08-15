@@ -1,0 +1,64 @@
+{
+  "bc": {
+    "n": 599,
+    "accuracy": 0.3723,
+    "mean_tokens": 256.9,
+    "mean_stop_step": 4.39,
+    "token_reduction_pct": 52.26,
+    "accuracy_delta_vs_full": -0.0334,
+    "stopped_early_pct": 89.8,
+    "easy_mean_tokens": 244.5,
+    "easy_accuracy": 0.8794,
+    "easy_n": 141,
+    "medium_mean_tokens": 275.6,
+    "medium_accuracy": 0.552,
+    "medium_n": 125,
+    "hard_mean_tokens": 255.2,
+    "hard_accuracy": 0.0901,
+    "hard_n": 333
+  },
+  "dqn_sweep": [
+    {
+      "multiplier": 0.05,
+      "floor": 0,
+      "accuracy": 0.3456,
+      "saved": 51.7
+    },
+    {
+      "multiplier": 0.1,
+      "floor": 0,
+      "accuracy": 0.3172,
+      "saved": 61.94
+    },
+    {
+      "multiplier": 0.2,
+      "floor": 0,
+      "accuracy": 0.3105,
+      "saved": 63.36
+    },
+    {
+      "multiplier": 0.35,
+      "floor": 0,
+      "accuracy": 0.3255,
+      "saved": 60.37
+    }
+  ],
+  "full": {
+    "n": 599,
+    "accuracy": 0.4057,
+    "mean_tokens": 538.2,
+    "mean_stop_step": 10.58,
+    "token_reduction_pct": 0.0,
+    "accuracy_delta_vs_full": 0.0,
+    "stopped_early_pct": 0.0,
+    "easy_mean_tokens": 427.1,
+    "easy_accuracy": 0.8156,
+    "easy_n": 141,
+    "medium_mean_tokens": 540.1,
+    "medium_accuracy": 0.744,
+    "medium_n": 125,
+    "hard_mean_tokens": 584.5,
+    "hard_accuracy": 0.1051,
+    "hard_n": 333
+  }
+}

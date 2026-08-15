@@ -1,0 +1,19 @@
+{
+  "n_traces": 4000,
+  "n_transitions": 91706,
+  "state_dim": 14,
+  "token_budget": 768,
+  "mean_oracle_return": 0.2033,
+  "stop_reward_mean": -0.5112,
+  "continue_reward_mean": -0.0146,
+  "by_split": {
+    "test": 13874,
+    "train": 63884,
+    "val": 13948
+  },
+  "by_difficulty": {
+    "easy": 16880,
+    "hard": 55138,
+    "medium": 19688
+  }
+}

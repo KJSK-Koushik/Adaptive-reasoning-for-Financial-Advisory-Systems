@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Environment
+.env
+*.local.yaml
+
+# Data - never commit raw or processed datasets
+data/raw/**
+data/interim/**
+data/processed/**
+!data/**/.gitkeep
+!data/**/README.md
+
+# Artifacts - large, regenerable
+artifacts/traces/**
+artifacts/models/**
+artifacts/logs/**
+!artifacts/**/.gitkeep
+
+# Results are small and worth keeping, but not the raw plots dump
+artifacts/results/**/*.png
+artifacts/results/**/*.pdf
+
+# Experiment tracking
+mlruns/
+wandb/
+
+# OS
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Office lock/temp files
+~$*
+
+# Large regenerable result bundles
+phase3_results.zip
+*.zip

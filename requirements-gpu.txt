@@ -1,0 +1,12 @@
+# Extra packages needed ONLY for Phase 3 (reasoning trace generation) on a CUDA machine,
+# e.g. a Kaggle Notebook (P100 / T4 x2), Google Colab, or a rented GPU.
+#
+# Install on top of requirements.txt, but replace the CPU torch first:
+#   pip install torch --index-url https://download.pytorch.org/whl/cu121
+#   pip install -r requirements-gpu.txt
+
+accelerate>=0.33
+bitsandbytes>=0.43        # 4-bit / 8-bit quantisation (Linux + CUDA)
+sentencepiece>=0.2
+safetensors>=0.4
+nvidia-ml-py>=12.555      # pynvml - GPU power and memory sampling for the energy metrics

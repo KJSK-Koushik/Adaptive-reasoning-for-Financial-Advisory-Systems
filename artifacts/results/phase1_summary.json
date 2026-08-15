@@ -1,0 +1,40 @@
+{
+  "total": 30660,
+  "by_source": {
+    "finqa": 8208,
+    "tatqa": 4000,
+    "convfinqa": 3000,
+    "phrasebank": 3452,
+    "paysim": 5000,
+    "german_credit": 1000,
+    "synthetic": 6000
+  },
+  "by_domain": {
+    "report_qa": 15208,
+    "sentiment": 3452,
+    "fraud": 5000,
+    "risk": 1000,
+    "investment": 6000
+  },
+  "by_answer_type": {
+    "numeric": 21043,
+    "categorical": 9617
+  },
+  "by_split": {
+    "train": 21459,
+    "test": 4602,
+    "val": 4599
+  },
+  "mean_question_chars": 99.2,
+  "mean_context_chars": 463.4,
+  "raw_counts": {
+    "finqa": 8281,
+    "tatqa": 11162,
+    "convfinqa": 12594,
+    "phrasebank": 3453,
+    "paysim": 5000,
+    "german_credit": 1000,
+    "synthetic": 6000
+  },
+  "duplicates_removed": 92
+}

@@ -1,0 +1,38 @@
+# Tiny end-to-end run for development and CI. Everything is shrunk so the full
+# pipeline finishes on a CPU in minutes, which is how each phase gets debugged
+# before it is run at scale.
+#
+#   python scripts/check_env.py --experiment smoke
+
+data:
+  sample_sizes:
+    finqa: 200
+    tatqa: 100
+    convfinqa: 100
+    phrasebank: 100
+    paysim: 200
+    german_credit: 100
+    synthetic: 200
+
+difficulty:
+  k_samples: 3
+  # Short cap: on CPU the smoke run is about proving the pipeline works, not about
+  # giving the model room to think.
+  sample_max_new_tokens: 128
+  n_questions: 24
+
+llm:
+  model_id: Qwen/Qwen2.5-0.5B-Instruct
+  dtype: float32
+  max_new_tokens: 256
+  batch_size: 2
+
+traces:
+  n_questions: 50
+  max_steps: 8
+  checkpoint_every: 10
+
+rl:
+  dqn:
+    train_steps: 2000
+    eval_every: 500

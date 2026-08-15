@@ -1,0 +1,18 @@
+{
+  "model_id": "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
+  "device": "cuda",
+  "n_questions": 50,
+  "median_reasoning_tokens": 636.5,
+  "mean_reasoning_tokens": 632.3,
+  "p90_reasoning_tokens": 1024.0,
+  "max_reasoning_tokens": 1024,
+  "think_tag_rate": 0.84,
+  "answer_rate": 0.98,
+  "truncation_rate": 0.16,
+  "wall_seconds": 308.9,
+  "tokens_per_second": 103.1,
+  "accuracy": 0.38,
+  "passed": true,
+  "failures": [],
+  "projected_phase3_hours": 77.81
+}
