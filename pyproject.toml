@@ -6,7 +6,10 @@ build-backend = "setuptools.build_meta"
 name = "adaptive-reasoning-fas"
 version = "0.1.0"
 description = "Difficulty-aware DQN for adaptive LLM reasoning termination, applied to financial advisory"
-requires-python = ">=3.10"
+# 3.11 is the floor because src/adaptive_reasoning/schema.py uses enum.StrEnum, which
+# was added in 3.11. This previously read ">=3.10" while the code needed 3.11, and CI
+# caught the mismatch on the 3.10 matrix leg.
+requires-python = ">=3.11"
 readme = "README.md"
 
 [tool.setuptools.packages.find]

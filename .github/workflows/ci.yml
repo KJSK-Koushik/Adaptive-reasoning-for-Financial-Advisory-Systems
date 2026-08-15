@@ -31,7 +31,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11"]
+        # 3.11 is the development version and the floor (schema.py needs enum.StrEnum,
+        # added in 3.11). 3.12 is what Kaggle Notebooks run, which is where Phase 3
+        # executes - so the remote environment is covered by CI rather than assumed.
+        python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
