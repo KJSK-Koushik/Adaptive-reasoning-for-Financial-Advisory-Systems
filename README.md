@@ -51,15 +51,15 @@ tests/                    pytest suite
 | 0 | Scaffolding, config, environment | **complete** |
 | 1 | Data pipeline and unified schema | **complete** — 30,660 rows, all 7 sources |
 | 2a | Difficulty labelling and classifier (CPU) | **complete** — all 3 stages verified |
-| 2b | k-sample run on GPU | pending, bundled with Phase 3 |
+| 2b | k-sample run on GPU | **complete** - bundled with Phase 3 |
 | 3a | Trace generator + probing (code) | **complete** — validated on CPU |
-| 3b | Trace generation run (GPU) | pending — **run `scripts/run_pilot.py` first** |
+| 3b | Trace generation run (GPU) | **complete** - 4,000 traces at a 768-token budget |
 | 4 | Offline RL environment | **complete** — 91,706 transitions |
 | 5 | DQN training | **complete** — see docs/FINDINGS.md |
 | 6 | Baselines and evaluation | **complete** - see artifacts/results/phase6_summary.json |
 | 7 | Real-time inference controller | **complete** - verified identical to the offline evaluation |
 | 8 | Financial advisory application | **complete** - FastAPI service and Streamlit dashboard |
-| 9 | Ablations and final results | not started |
+| 9 | Ablations and final results | **complete** - see docs/FINDINGS.md section 7 |
 
 ## Setup
 
