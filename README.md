@@ -58,7 +58,7 @@ tests/                    pytest suite
 | 5 | DQN training | **complete** — see docs/FINDINGS.md |
 | 6 | Baselines and evaluation | **complete** - see artifacts/results/phase6_summary.json |
 | 7 | Real-time inference controller | **complete** - verified identical to the offline evaluation |
-| 8 | Financial advisory application | not started |
+| 8 | Financial advisory application | **complete** - FastAPI service and Streamlit dashboard |
 | 9 | Ablations and final results | not started |
 
 ## Setup
