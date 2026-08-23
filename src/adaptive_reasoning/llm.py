@@ -72,6 +72,13 @@ class ReasoningLLM:
             )
 
             kwargs: dict = {"dtype": dtype}
+
+            # Streaming weights to the device avoids ever holding the full model in
+            # host RAM. Required for anything above ~3B on a Kaggle session.
+            device_map = getattr(self.cfg.llm, "device_map", None)
+            if device_map and self.hw.backend == "cuda":
+                kwargs["device_map"] = device_map
+                kwargs["low_cpu_mem_usage"] = True
             if self.cfg.llm.load_in_4bit and self.hw.backend == "cuda":
                 from transformers import BitsAndBytesConfig
 
@@ -90,7 +97,10 @@ class ReasoningLLM:
                 kwargs["torch_dtype"] = kwargs.pop("dtype", dtype)
                 model = AutoModelForCausalLM.from_pretrained(self.model_id, **kwargs)
 
-            if self.hw.backend != "cuda" or "quantization_config" not in kwargs:
+            # A model dispatched by accelerate is already placed, and moving it
+            # afterwards undoes the dispatch (and re-materialises it on one device).
+            dispatched = "device_map" in kwargs or "quantization_config" in kwargs
+            if not dispatched:
                 model = model.to(self.hw.device)
             model.eval()
             torch.set_grad_enabled(False)

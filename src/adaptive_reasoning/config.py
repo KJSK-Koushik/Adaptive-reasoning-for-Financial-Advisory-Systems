@@ -114,6 +114,12 @@ class LLMCfg(_Base):
     temperature: float
     top_p: float
     batch_size: int
+    # How to place weights. None builds the whole model in CPU RAM and then moves it,
+    # which is fine for a 1.5B model and fatal for a 7B one: 14 GB of float16 weights
+    # do not fit in a Kaggle session's ~13 GB of RAM, and the load silently stalls
+    # part-way through materialising parameters. "auto" streams shards straight to the
+    # available GPUs instead, and never holds the full model on the host.
+    device_map: str | None = None
 
 
 class TraceCaptureCfg(_Base):
