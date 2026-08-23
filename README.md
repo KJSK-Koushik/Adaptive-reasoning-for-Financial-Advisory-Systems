@@ -56,7 +56,7 @@ tests/                    pytest suite
 | 3b | Trace generation run (GPU) | pending — **run `scripts/run_pilot.py` first** |
 | 4 | Offline RL environment | **complete** — 91,706 transitions |
 | 5 | DQN training | **complete** — see docs/FINDINGS.md |
-| 6 | Baselines and evaluation | not started |
+| 6 | Baselines and evaluation | **complete** - see artifacts/results/phase6_summary.json |
 | 7 | Real-time inference controller | not started |
 | 8 | Financial advisory application | not started |
 | 9 | Ablations and final results | not started |
