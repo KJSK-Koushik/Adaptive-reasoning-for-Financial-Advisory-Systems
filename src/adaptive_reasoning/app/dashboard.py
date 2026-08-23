@@ -22,6 +22,8 @@ _SRC = Path(__file__).resolve().parents[2]
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
+import re  # noqa: E402
+
 import streamlit as st  # noqa: E402
 
 from adaptive_reasoning.app.api import DemoStore  # noqa: E402
@@ -35,6 +37,20 @@ from adaptive_reasoning.serve.controller import (  # noqa: E402
 TOKENS_PER_SECOND = 91.5     # measured by the Phase 3 pilot on a Kaggle T4
 
 POLICY_NAMES = {"dqn": "Difficulty-aware DQN", "bc": "Behaviour cloning"}
+
+#: FinQA and ConvFinQA question ids carry the filing year, e.g.
+#: finqa::C/2009/page_141.pdf-3. The other five sources have no year in the id and are
+#: never excluded by this filter.
+_YEAR = re.compile(r"/((?:19|20)\d{2})/")
+
+#: Filings older than this are hidden from the picker. A presentation choice only: the
+#: reported accuracy in Phase 6 is measured over the whole test split, not this subset.
+MIN_YEAR = 2015
+
+
+def _recent_enough(question_id: str) -> bool:
+    match = _YEAR.search(str(question_id))
+    return match is None or int(match.group(1)) >= MIN_YEAR
 
 
 def _artifact_stamp() -> tuple:
@@ -85,6 +101,7 @@ def main() -> None:
     with st.sidebar:
         st.subheader("Choose a question")
         frame = store.questions[store.questions.index.isin(store.test_ids)]
+        frame = frame[[_recent_enough(q) for q in frame.index]]
 
         domain = st.selectbox("Topic",
                               ["all"] + sorted(frame.domain.unique().tolist()))
@@ -99,6 +116,8 @@ def main() -> None:
             "Question", options,
             format_func=lambda q: str(frame.loc[q, "question"])[:60] + " ...",
         )
+
+        st.caption(f"Showing filings from {MIN_YEAR} onwards.")
 
         st.subheader("Stopping policy")
         policy_name = st.radio(
