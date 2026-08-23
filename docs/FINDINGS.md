@@ -44,6 +44,32 @@ Supporting evidence — the probability that the current answer is correct, by s
 mean of 11.5 steps, so roughly half of all reasoning is spent after the point where it
 stops helping.
 
+### A known under-count in the grading
+
+Probe answers are capped at 16 tokens (`traces.probe_max_tokens`), so a longer answer
+is cut off mid-sentence and the trailing fragment is often a partial number:
+
+    gold 4751   <- "a decrease of $4,751 in operating income from 20"
+    gold 150    <- "150 units. Wait, let me double-check that. 3"
+
+`extract_numbers` reads the *last* number in a string, which is the right rule for a
+finished answer ("...so the growth is 12.4%") and the wrong one for a truncated one.
+Roughly **295 probe rows, 0.6% of the total, are marked wrong this way** - accuracy
+here is therefore a slight under-count.
+
+It has not been fixed. Preferring the first number instead rescues those 295 rows but
+introduces the opposite error, and the data contains clear examples:
+
+    gold 16     <- "16.0 divided by 3, which equals approximately 5"
+
+where the answer is 5.33 and accepting the leading 16 would score a wrong answer as
+right. A grader that marks wrong answers right inflates results; one that marks some
+right answers wrong understates them. The second is the safer failure, so the
+under-count stands and is reported rather than removed.
+
+The root cause is the 16-token probe limit, and fixing it properly means regenerating
+traces on GPU.
+
 ## 2. A perfect stopping policy would be both cheaper *and* more accurate
 
 | Policy | Accuracy | Mean tokens |
