@@ -2,20 +2,28 @@
 #
 #     python scripts/run_phase5.py --experiment reported
 #
-# The only difference from configs/default.yaml is how the best DQN checkpoint is
-# chosen on validation.
+# It matches configs/default.yaml. The file exists so the reported operating point is
+# stated somewhere explicit and cannot drift if the default is edited - the figures in
+# docs/FINDINGS.md and the review deck were once produced with an override nobody had
+# written down, which cost an afternoon to reconstruct.
 #
-#   weighted_score      accuracy + 0.30 * token_reduction. Picks a checkpoint that
-#                       saves ~65% of tokens, which is the operating point every
-#                       number in docs/FINDINGS.md and the review deck is quoted at.
+# How the best DQN checkpoint is chosen on validation decides the operating point, and
+# the two available objectives put the policy in genuinely different places:
 #
-#   accuracy_at_budget  (the default) maximises accuracy subject to saving at least
-#                       min_token_reduction percent. It lands at a cheaper operating
-#                       point - ~45% saved, 37.1% accuracy - which is a legitimate
-#                       result but a different one.
+#   accuracy_at_budget  (used here) maximise accuracy subject to saving at least
+#                       min_token_reduction percent. The budget is stated, so the
+#                       matched-cost comparison against the baselines is meaningful.
+#                       Lands at ~45% saved and 39.2% accuracy.
 #
-# Both are honest; they are different points on the same accuracy-versus-cost curve.
-# Reports must name which one they used, so this file exists to pin it down.
+#   weighted_score      accuracy + 0.30 * token_reduction. The 0.30 is arbitrary and
+#                       quietly decides how much accuracy a token is worth: at this
+#                       weight the policy stops at step 0 on 54% of questions, where
+#                       accuracy is 21%, and lands at ~65% saved and 33.7% accuracy.
+#
+# Both are real points on one frontier and neither is wrong, but a stated budget is
+# defensible in a way an arbitrary weight is not. The aggressive point is reported in
+# docs/FINDINGS.md as the cost-sensitive end of the frontier, not hidden.
 rl:
   selection:
-    objective: weighted_score
+    objective: accuracy_at_budget
+    min_token_reduction: 45.0

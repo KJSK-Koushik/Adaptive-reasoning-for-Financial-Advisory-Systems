@@ -60,33 +60,57 @@ accuracy, and good stopping recovers it.
 
 ## 3. Learned stopping clearly beats fixed-rule stopping
 
-At matched cost (~64% of tokens saved):
+At matched cost (~45% of tokens saved):
 
 | Policy | Accuracy |
 |---|---|
-| Stop at a fixed step | 29.2% |
-| **Difficulty-aware DQN** | **33.7%** |
+| Stop at a fixed step | 32.1% |
+| Stop at a fixed token budget | 32.1% |
+| Confidence threshold | 30.2% |
+| Entropy threshold | 26.5% |
+| **Difficulty-aware DQN** | **39.2%** |
 
-**+4.5 accuracy points at the same cost** (95% CI +0.7 to +8.4, p = 0.027). Fixed thresholds are what prior work
-actually uses, so this is the comparison the contribution rests on.
+**+7.2 accuracy points over a fixed step at the same cost** (95% CI +3.3 to +10.9,
+p = 0.0004). Confidence and entropy thresholds are what the early-exit literature
+actually uses, and the DQN beats both by more (+9.0 and +12.7). This is the comparison
+the contribution rests on.
 
-Other operating points are available by moving the selection budget - see the
-frontier in section 5.
+### The operating point is a choice, and it has to be stated
 
-## 4. But reinforcement learning does *not* beat supervised imitation
+How the best checkpoint is selected on validation decides where on the frontier the
+policy sits, and the two objectives land somewhere quite different:
 
-Compared at matched cost (~52% of tokens saved), selecting each on validation by
-"maximise accuracy subject to the cost budget" - these two figures come from the
-reward-rebalancing run recorded in `artifacts/results/phase5_rebalance.json`, not
-from the `reported` config above:
+| Selection | Tokens saved | Accuracy | vs fixed step | vs behaviour cloning |
+|---|---|---|---|---|
+| `accuracy_at_budget` (reported) | 45% | **39.2%** | +7.2, p=0.0004 | +0.2, p=1.0 |
+| `weighted_score` (aggressive) | 65% | 33.7% | +4.5, p=0.027 | -5.3, p=0.006 |
 
-| Policy | Accuracy |
-|---|---|
-| Behaviour cloning (supervised) | **39.1%** |
-| DQN (reinforcement learning) | 33.7% |
+The reported point states a budget. The aggressive one uses `accuracy + 0.30 x
+token_reduction`, where the 0.30 silently prices a token against accuracy: at that
+weight the policy stops at **step 0 on 54% of questions**, where accuracy is 21%. Both
+are honest points on one frontier, but a stated budget is defensible in a way an
+arbitrary weight is not, so the reported figures use the former.
 
-The DQN is ~5.3 points behind (p = 0.006), and this held across four reward cost-multipliers
-(0.05, 0.1, 0.2, 0.35), so it is not a tuning artefact.
+## 4. Reinforcement learning matches supervised imitation, but does not beat it
+
+| Policy | Accuracy | Tokens saved |
+|---|---|---|
+| Behaviour cloning (supervised) | 39.1% | **53.5%** |
+| DQN (reinforcement learning) | **39.2%** | 44.7% |
+
+On accuracy this is a dead heat (+0.2 points, p = 1.0). But behaviour cloning reaches
+it **8.8 points of budget cheaper**, so it still edges the DQN on the trade-off rather
+than losing to it. Reporting the accuracy tie alone would flatter the DQN, which is
+why Phase 6 labels any comparison where the two policies spend differently.
+
+Behaviour cloning imitates the oracle and therefore has exactly one operating point;
+the DQN can be moved along the frontier. That is the honest statement of what each
+method offers.
+
+An earlier version of this document reported the DQN 5.3 points *behind*. That figure
+was real but taken at the aggressive operating point above - a reminder that a
+single-number comparison between two policies at different costs says as much about
+the operating points as about the methods.
 
 ### Why - and it is not the reward
 
@@ -150,9 +174,23 @@ The learned policy does the reverse:
 
 | Tier | Unaided reasoning | Stopped at | Share used | Accuracy |
 |---|---|---|---|---|
+| Easy | 427 tokens | 258 | **60%** | 83.7% |
+| Medium | 540 tokens | 264 | **49%** | 60.8% |
+| Hard | 585 tokens | 327 | **56%** | 12.3% |
+
+At the reported operating point the allocation is close to flat - the budget is loose
+enough that the policy does not have to choose. At the aggressive point it becomes
+strongly difficulty-ordered:
+
+| Tier | Full reasoning | DQN tokens | Share used | Accuracy |
+|---|---|---|---|---|
 | Easy | 427 tokens | 222 | **52%** | 77.3% |
 | Medium | 540 tokens | 224 | **41%** | 45.6% |
 | Hard | 585 tokens | 166 | **28%** | 10.8% |
+
+So difficulty-awareness shows up **when the budget binds**, which is the situation it
+was designed for. Claiming it as an unconditional property of the policy would
+overstate it.
 
 Note that absolute token counts are misleading: hard questions get *longer* traces to
 begin with, so the policy is in fact cutting them hardest (73% saved on hard vs 46% on

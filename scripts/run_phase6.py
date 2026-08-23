@@ -198,8 +198,12 @@ def main() -> int:
     # A family that cannot be pushed to the DQN's budget is not a fair rival at
     # that budget, and saying so is more honest than quietly comparing across costs.
     TOLERANCE = 3.0
+    # behaviour_cloning is included: it imitates the oracle and so has exactly one
+    # operating point, which is usually not the DQN's. Comparing the two on accuracy
+    # alone, without saying they spend differently, would flatter whichever is dearer.
     for name in ("fixed_step_matched", "fixed_budget_matched", "confidence_matched",
-                 "entropy_matched", "stability_matched", "random_matched"):
+                 "entropy_matched", "stability_matched", "random_matched",
+                 "behaviour_cloning"):
         if name in results:
             gap = results[name]["token_reduction_pct"] - target
             results[name]["cost_gap_pct"] = round(gap, 2)
