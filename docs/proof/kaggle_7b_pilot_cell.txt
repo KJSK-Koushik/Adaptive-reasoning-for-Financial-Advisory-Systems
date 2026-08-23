@@ -1,89 +1,64 @@
 # ── 7B PILOT ─────────────────────────────────────────────────────────────
 # Paste as a NEW cell at the end of the Kaggle notebook and run it.
-# Self-contained: finds the project itself, and refuses to run against an old
-# copy of the dataset rather than failing obscurely ten seconds later.
+#
+# Data comes from the attached dataset; CODE is pulled fresh from GitHub each
+# run. That split matters: a Kaggle notebook stays pinned to the dataset
+# version it was attached at, so re-uploading code as a dataset does not reach
+# the notebook, while a git clone always gets the current commit.
+#
 # Cost: ~1 hour on a T4. Writes only artifacts/results/phase3_pilot.json.
 
-import glob, json, os, shutil, subprocess, sys, zipfile
+import glob, json, os, shutil, subprocess, sys
 from pathlib import Path
 
+REPO = 'https://github.com/KJSK-Koushik/Adaptive-reasoning-for-Financial-Advisory-Systems.git'
 WORK, INPUT = Path('/kaggle/working'), Path('/kaggle/input')
-PROJECT = WORK / 'project'
+PROJECT, FRESH = WORK / 'project', WORK / '_repo'
 
-
-def has_fix(root):
-    """Does this project tree support llm.device_map?
-
-    Without it, transformers builds the whole model in CPU RAM (~14 GB for 7B in
-    float16) before moving it to the GPU. A Kaggle session has about 13 GB, so the
-    load stalls part-way through "Materializing param" and never recovers.
-    """
-    cfg = Path(root) / 'src' / 'adaptive_reasoning' / 'config.py'
-    return cfg.exists() and 'device_map' in cfg.read_text(encoding='utf-8')
-
-
-def roots_under(base):
-    """Every project tree beneath `base`, newest-looking first."""
-    found = glob.glob(str(base / '**' / 'configs' / 'default.yaml'), recursive=True)
-    return [Path(m).parent.parent for m in found]
-
-
-# 1. find a project tree that has the fix, looking in the working copy first and
-#    then in the attached dataset. A stale /kaggle/working/project left by an
-#    earlier run must not shadow a freshly attached dataset version.
-candidates = roots_under(WORK) + roots_under(INPUT)
-
-if not candidates:
-    zips = glob.glob(str(INPUT / '**' / 'adaptive-reasoning.zip'), recursive=True)
-    if not zips:
-        raise SystemExit(
-            'No project found. Sidebar -> Add Input -> your Datasets -> '
-            'adaptive-reasoning-fas, then re-run this cell.'
-        )
-    print('unpacking', zips[0])
-    with zipfile.ZipFile(zips[0]) as zf:
-        zf.extractall(WORK)
-    candidates = roots_under(WORK)
-
-fixed = [c for c in candidates if has_fix(c)]
-if not fixed:
-    print('project trees found:')
-    for c in candidates:
-        print('   ', c)
+# ── 1. data, from the attached dataset ───────────────────────────────────
+found = glob.glob(str(INPUT / '**' / 'data' / 'processed' / 'unified.parquet'),
+                  recursive=True)
+if not found:
     raise SystemExit(
-        """
-        All of these are an OLD version of the code - none supports llm.device_map,
-        so the 7B model cannot be loaded.
-
-        Kaggle pins a notebook to the dataset version it was attached at, so
-        uploading a new version does not move it. To fix:
-
-          1. sidebar -> Input -> remove adaptive-reasoning-fas
-          2. Add Input -> your Datasets -> adaptive-reasoning-fas (latest version)
-          3. Run -> Factory reset  (clears the stale /kaggle/working copy)
-          4. re-run this cell
-        """
+        'unified.parquet not found. Sidebar -> Add Input -> your Datasets -> '
+        'adaptive-reasoning-fas, then re-run this cell.'
     )
+data_root = Path(found[0]).parent.parent.parent
+print('data from:', data_root)
 
-source = fixed[0]
+if PROJECT.exists():
+    shutil.rmtree(PROJECT)
+PROJECT.mkdir(parents=True)
+shutil.copytree(data_root / 'data', PROJECT / 'data')
 
-# 2. /kaggle/input is read-only, so work from a copy under /kaggle/working.
-if str(source).startswith(str(INPUT)):
-    if PROJECT.exists():
-        print('replacing the stale copy at', PROJECT)
-        shutil.rmtree(PROJECT)
-    print('copying project from', source)
-    shutil.copytree(source, PROJECT)
-    root = PROJECT
-else:
-    root = source
+# ── 2. code, from GitHub ─────────────────────────────────────────────────
+if FRESH.exists():
+    shutil.rmtree(FRESH)
+print('cloning the current code ...')
+subprocess.check_call(['git', 'clone', '--depth', '1', '--quiet', REPO, str(FRESH)])
 
-os.chdir(root)
+for part in ('src', 'scripts', 'configs'):
+    shutil.copytree(FRESH / part, PROJECT / part)
+for f in ('requirements.txt', 'requirements-gpu.txt', 'pyproject.toml'):
+    if (FRESH / f).exists():
+        shutil.copy2(FRESH / f, PROJECT / f)
+
+commit = subprocess.run(['git', '-C', str(FRESH), 'log', '-1', '--format=%h %s'],
+                        capture_output=True, text=True).stdout.strip()
+print('code at commit:', commit)
+
+os.chdir(PROJECT)
 print('working directory:', os.getcwd())
-assert Path('scripts/run_pilot.py').exists(), f'run_pilot.py missing under {root}'
+
+# The fix this pilot depends on. Without device_map, transformers builds the whole
+# model in CPU RAM (~14 GB for 7B in float16) before moving it to the GPU, and a
+# Kaggle session has about 13 GB - the load stalls part-way through "Materializing
+# param" and never recovers.
+cfg_src = Path('src/adaptive_reasoning/config.py').read_text(encoding='utf-8')
+assert 'device_map' in cfg_src, 'cloned code has no device_map - check the repo'
 print('device_map supported: True')
 
-# 3. dependencies - only install if this is a fresh session
+# ── 3. dependencies ──────────────────────────────────────────────────────
 try:
     import torch, transformers  # noqa: F401
     print('dependencies already present')
@@ -91,9 +66,8 @@ except ImportError:
     print('installing dependencies (a few minutes) ...')
     subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-q',
                            '-r', 'requirements.txt'])
-    subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-q', '-e', '.'])
 
-# 4. the 7B config. device_map=auto streams shards straight to the two T4s.
+# ── 4. the 7B config ─────────────────────────────────────────────────────
 Path('configs/experiment').mkdir(parents=True, exist_ok=True)
 Path('configs/experiment/pilot7b.yaml').write_text("""llm:
   model_id: deepseek-ai/DeepSeek-R1-Distill-Qwen-7B
@@ -112,7 +86,7 @@ traces:
 rc = subprocess.call([sys.executable, 'scripts/run_pilot.py', '--experiment', 'pilot7b'])
 print('\nexit code:', rc)
 
-# 5. the numbers that decide the project
+# ── 5. the numbers that decide the project ───────────────────────────────
 out = Path('artifacts/results/phase3_pilot.json')
 if rc != 0 or not out.exists():
     raise SystemExit(
