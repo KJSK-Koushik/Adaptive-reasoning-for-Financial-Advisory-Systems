@@ -15,6 +15,12 @@ REPO = 'https://github.com/KJSK-Koushik/Adaptive-reasoning-for-Financial-Advisor
 WORK, INPUT = Path('/kaggle/working'), Path('/kaggle/input')
 PROJECT, FRESH = WORK / 'project', WORK / '_repo'
 
+# A previous run may have left the kernel sitting inside /kaggle/working/project,
+# which this cell is about to delete. Deleting the process's own cwd leaves it with
+# no directory to resolve, and the next subprocess dies with
+# "fatal: Unable to read current working directory".
+os.chdir(WORK)
+
 # ── 1. data, from the attached dataset ───────────────────────────────────
 found = glob.glob(str(INPUT / '**' / 'data' / 'processed' / 'unified.parquet'),
                   recursive=True)
@@ -35,7 +41,8 @@ shutil.copytree(data_root / 'data', PROJECT / 'data')
 if FRESH.exists():
     shutil.rmtree(FRESH)
 print('cloning the current code ...')
-subprocess.check_call(['git', 'clone', '--depth', '1', '--quiet', REPO, str(FRESH)])
+subprocess.check_call(['git', 'clone', '--depth', '1', '--quiet', REPO, str(FRESH)],
+                      cwd=str(WORK))
 
 for part in ('src', 'scripts', 'configs'):
     shutil.copytree(FRESH / part, PROJECT / part)
@@ -44,7 +51,7 @@ for f in ('requirements.txt', 'requirements-gpu.txt', 'pyproject.toml'):
         shutil.copy2(FRESH / f, PROJECT / f)
 
 commit = subprocess.run(['git', '-C', str(FRESH), 'log', '-1', '--format=%h %s'],
-                        capture_output=True, text=True).stdout.strip()
+                        capture_output=True, text=True, cwd=str(WORK)).stdout.strip()
 print('code at commit:', commit)
 
 os.chdir(PROJECT)
