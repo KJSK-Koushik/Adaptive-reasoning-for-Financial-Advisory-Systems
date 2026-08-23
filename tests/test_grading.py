@@ -5,6 +5,7 @@ import pytest
 from adaptive_reasoning.grading import (
     categorical_match,
     extract_number,
+    extract_numbers,
     is_correct,
     normalise_categorical,
     numeric_match,
@@ -96,3 +97,51 @@ def test_is_correct_dispatch():
 def test_is_correct_handles_none():
     assert not is_correct(None, "12", "numeric")
     assert not is_correct("12", None, "numeric")
+
+
+# --------------------------------------------------------------------------- #
+# scale words - the unit is often stated in the question, not the answer
+# --------------------------------------------------------------------------- #
+class TestScaleWords:
+    """FinQA asks "...in millions?" and stores ``407``. A model answering
+    "407 million dollars" is right, and scoring it wrong cost 3.3% of numeric probes.
+    """
+
+    @pytest.mark.parametrize("predicted", [
+        "407 million dollars",
+        "$407 million",
+        "407 million",
+        "the answer is 407 million",
+        "407.0 million",
+    ])
+    def test_explicit_unit_matches_a_bare_gold_value(self, predicted):
+        assert numeric_match(predicted, "407")
+
+    def test_explicit_unit_still_matches_a_fully_written_gold_value(self):
+        assert numeric_match("407 million", "407000000")
+
+    def test_both_readings_are_offered(self):
+        assert extract_numbers("407 million") == [407_000_000.0, 407.0]
+
+    def test_a_bare_number_has_a_single_reading(self):
+        assert extract_numbers("407") == [407.0]
+
+    def test_the_sign_survives_both_readings(self):
+        assert extract_numbers("-2.5 billion") == [-2.5e9, -2.5]
+        assert numeric_match("(407) million", "-407")
+
+    def test_leniency_does_not_extend_to_a_different_value(self):
+        """The allowance is about units, not about being roughly in the area."""
+        assert not numeric_match("500 million", "407")
+        assert not numeric_match("407 million", "450000000")
+
+    def test_gold_may_carry_the_scale_word_instead(self):
+        assert numeric_match("1234", "1,234 thousand")
+
+    def test_empty_input_has_no_readings(self):
+        assert extract_numbers("") == []
+        assert extract_numbers("no digits here") == []
+
+    def test_extract_number_still_returns_the_scaled_reading(self):
+        """The single-value helper is unchanged - adapters rely on it."""
+        assert extract_number("407 million") == 407_000_000.0

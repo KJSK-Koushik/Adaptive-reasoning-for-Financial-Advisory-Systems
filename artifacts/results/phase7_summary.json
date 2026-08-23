@@ -1,19 +1,19 @@
 {
-  "policy": "bc",
+  "policy": "dqn",
   "n_questions": 599,
-  "accuracy": 0.3706,
-  "mean_tokens": 260.0,
-  "token_reduction_pct": 51.69,
+  "accuracy": 0.3372,
+  "mean_tokens": 191.0,
+  "token_reduction_pct": 64.5,
   "stopped_by_cap": 0,
   "feature_max_difference": 0.0,
   "demo": {
     "question_id": "tatqa::1e6072e9230103dea533b229bbe742e2",
-    "answer": "$309,700",
-    "stop_step": 7,
-    "tokens_used": 384,
+    "answer": "160,900",
+    "stop_step": 0,
+    "tokens_used": 48,
     "tokens_available": 560,
-    "token_reduction_pct": 31.4,
+    "token_reduction_pct": 91.4,
     "stop_reason": "policy",
-    "n_decisions": 8
+    "n_decisions": 1
   }
 }

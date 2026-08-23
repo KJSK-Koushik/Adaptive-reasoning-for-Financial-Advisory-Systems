@@ -113,26 +113,68 @@ def normalise_categorical(text: str) -> str:
     return cleaned
 
 
+def extract_numbers(text: str, prefer: str = "last") -> list[float]:
+    """Every plausible reading of the number in ``text``.
+
+    Usually one. When the text carries an explicit scale word the *unscaled* reading
+    is returned as well, because the unit is often stated in the question rather than
+    the answer. FinQA asks "what was the change, in millions?" and stores the gold
+    answer as ``407``; a model that answers "407 million dollars" is right, but
+    multiplying by a million makes it look wrong by a factor of 10^6.
+
+    This is deliberately lenient in one direction: because the gold value is unitless,
+    the grader cannot tell "407 million" from "407 billion" when the gold is ``407``,
+    and will accept either. Being strict instead would mark genuinely correct answers
+    wrong, which is the worse error - it was costing 3.3% of numeric probes.
+    """
+    if not text:
+        return []
+
+    matches = list(_NUMBER_RE.finditer(text))
+    if not matches:
+        return []
+
+    match = matches[-1] if prefer == "last" else matches[0]
+
+    raw = match.group("num").replace(",", "")
+    try:
+        value = float(raw)
+    except ValueError:
+        return []
+
+    negative = match.group("sign") == "-" or bool(match.group("paren"))
+    scale = _SCALES[match.group("scale").lower()] if match.group("scale") else None
+
+    readings = [value * scale] if scale else [value]
+    if scale:
+        readings.append(value)          # the unit may be implied by the question
+
+    return [-v if negative else v for v in readings]
+
+
+def _close(p: float, g: float, tolerance: float) -> bool:
+    """One value against another, with the percent/fraction allowance."""
+    if g == 0:
+        return abs(p) <= tolerance
+    if abs(p - g) / abs(g) <= tolerance:
+        return True
+    # Percent / fraction confusion: 0.124 written where 12.4 was wanted.
+    return any(abs(p * factor - g) / abs(g) <= tolerance for factor in (100.0, 0.01))
+
+
 def numeric_match(predicted: str, gold: str, tolerance: float = 0.01) -> bool:
     """Compare two numeric answers within a *relative* tolerance.
 
-    Falls back to absolute tolerance when the gold value is zero. Also accepts a
-    prediction that is off by exactly 100x, which is the classic
-    percent-vs-fraction mismatch (``0.124`` vs ``12.4``).
+    Falls back to absolute tolerance when the gold value is zero, accepts the classic
+    percent-versus-fraction mismatch, and accepts either reading of an explicit scale
+    word - see :func:`extract_numbers`.
     """
-    p = extract_number(predicted)
-    g = extract_number(gold)
-    if p is None or g is None:
+    predictions = extract_numbers(predicted)
+    golds = extract_numbers(gold)
+    if not predictions or not golds:
         return False
 
-    if g == 0:
-        return abs(p) <= tolerance
-
-    if abs(p - g) / abs(g) <= tolerance:
-        return True
-
-    # Percent / fraction confusion.
-    return any(abs(p * factor - g) / abs(g) <= tolerance for factor in (100.0, 0.01))
+    return any(_close(p, g, tolerance) for p in predictions for g in golds)
 
 
 def categorical_match(predicted: str, gold: str) -> bool:

@@ -4,6 +4,12 @@ Empirical results, including the ones that contradicted the original hypothesis.
 figures are on the held-out test split (599 questions, 4,000 traced in total) using
 `DeepSeek-R1-Distill-Qwen-1.5B` at a 768-token budget.
 
+All numbers were regenerated after the grading fix of 2026-08-23: the parser was
+multiplying an explicit scale word ("407 million") by its scale while the gold answer
+states the unit in the question and stores a bare `407`, so correct answers were being
+marked wrong. Re-grading turned 858 probe answers from wrong to right and none the
+other way. See `scripts/regrade_traces.py`.
+
 **Reproduce every number below with:**
 
 ```
@@ -22,8 +28,8 @@ curve. Figures quoted here are all at the 65% point unless stated otherwise.
 
 | | |
 |---|---|
-| Correct at the **end** of reasoning | **42.4%** |
-| Correct at **some point** during reasoning | **63.3%** |
+| Correct at the **end** of reasoning | **44.3%** |
+| Correct at **some point** during reasoning | **65.5%** |
 
 On roughly **one question in five, the model reaches the right answer and then talks
 itself out of it.** This is the premise of the project, measured rather than assumed.
@@ -32,7 +38,7 @@ Supporting evidence — the probability that the current answer is correct, by s
 
 | Step | 0 | 1 | 3 | 6 | 10 | 15 |
 |---|---|---|---|---|---|---|
-| Correct | 21.5% | 21.1% | 25.9% | 32.5% | 32.2% | 31.3% |
+| Correct | 22.6% | 22.8% | 28.3% | 34.7% | 33.7% | 32.9% |
 
 **Accuracy plateaus at about step 6 and never improves again.** The model reasons for a
 mean of 11.5 steps, so roughly half of all reasoning is spent after the point where it
@@ -42,26 +48,26 @@ stops helping.
 
 | Policy | Accuracy | Mean tokens |
 |---|---|---|
-| Full reasoning | 40.6% | 538 |
-| Oracle (stops at the earliest correct step) | **62.9%** | **135** |
+| Full reasoning | 44.7% | 538 |
+| Oracle (stops at the earliest correct step) | **65.3%** | **137** |
 
 Both rows are the 599 test questions. (Across all 4,000 traces full reasoning is
-42.4% at 533 tokens; the test split runs slightly harder.)
+44.3% at 533 tokens.)
 
-This is not a trade-off. Stopping well would save ~75% of tokens *and* gain ~20
+This is not a trade-off. Stopping well would save ~75% of tokens *and* gain ~21
 accuracy points. That reframes the contribution: overthinking actively destroys
 accuracy, and good stopping recovers it.
 
 ## 3. Learned stopping clearly beats fixed-rule stopping
 
-At matched cost (~65% of tokens saved):
+At matched cost (~64% of tokens saved):
 
 | Policy | Accuracy |
 |---|---|
-| Stop at a fixed step | 26.9% |
-| **Difficulty-aware DQN** | **32.4%** |
+| Stop at a fixed step | 29.2% |
+| **Difficulty-aware DQN** | **33.7%** |
 
-**+5.5 accuracy points at the same cost.** Fixed thresholds are what prior work
+**+4.5 accuracy points at the same cost** (95% CI +0.7 to +8.4, p = 0.027). Fixed thresholds are what prior work
 actually uses, so this is the comparison the contribution rests on.
 
 Other operating points are available by moving the selection budget - see the
@@ -76,10 +82,10 @@ from the `reported` config above:
 
 | Policy | Accuracy |
 |---|---|
-| Behaviour cloning (supervised) | **37.2%** |
-| DQN (reinforcement learning) | 34.6% |
+| Behaviour cloning (supervised) | **39.1%** |
+| DQN (reinforcement learning) | 33.7% |
 
-The DQN is ~2.7 points behind, and this held across four reward cost-multipliers
+The DQN is ~5.3 points behind (p = 0.006), and this held across four reward cost-multipliers
 (0.05, 0.1, 0.2, 0.35), so it is not a tuning artefact.
 
 ### Why - and it is not the reward
@@ -125,6 +131,11 @@ reward exposes a **tunable cost-accuracy dial**: sweeping `reward.cost_multiplie
 produces a family of policies along the frontier, so an operating point can be chosen
 for the deployment rather than accepted from the method.
 
+**Measured before the 2026-08-23 grading fix and not yet regenerated** - the shape of
+the frontier holds but every accuracy here is understated by roughly 2 points. Rerun
+with `python scripts/run_phase5.py --experiment reported --sweep` to refresh.
+
+
 | cost_multiplier | Accuracy | Tokens saved |
 |---|---|---|
 | 0.25 | 35.1% | 46.2% |
@@ -139,9 +150,9 @@ The learned policy does the reverse:
 
 | Tier | Unaided reasoning | Stopped at | Share used | Accuracy |
 |---|---|---|---|---|
-| Easy | 427 tokens | 233 | **54%** | 76.6% |
-| Medium | 540 tokens | 216 | **39%** | 44.8% |
-| Hard | 585 tokens | 159 | **30%** | 9.0% |
+| Easy | 427 tokens | 222 | **52%** | 77.3% |
+| Medium | 540 tokens | 224 | **41%** | 45.6% |
+| Hard | 585 tokens | 166 | **28%** | 10.8% |
 
 Note that absolute token counts are misleading: hard questions get *longer* traces to
 begin with, so the policy is in fact cutting them hardest (73% saved on hard vs 46% on

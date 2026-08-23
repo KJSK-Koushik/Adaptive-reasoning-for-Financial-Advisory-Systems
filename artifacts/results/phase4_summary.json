@@ -3,8 +3,8 @@
   "n_transitions": 91706,
   "state_dim": 14,
   "token_budget": 768,
-  "mean_oracle_return": 0.2033,
-  "stop_reward_mean": -0.5112,
+  "mean_oracle_return": 0.2472,
+  "stop_reward_mean": -0.4738,
   "continue_reward_mean": -0.0146,
   "by_split": {
     "test": 13874,
