@@ -1,0 +1,21 @@
+# The configuration every reported figure is produced with.
+#
+#     python scripts/run_phase5.py --experiment reported
+#
+# The only difference from configs/default.yaml is how the best DQN checkpoint is
+# chosen on validation.
+#
+#   weighted_score      accuracy + 0.30 * token_reduction. Picks a checkpoint that
+#                       saves ~65% of tokens, which is the operating point every
+#                       number in docs/FINDINGS.md and the review deck is quoted at.
+#
+#   accuracy_at_budget  (the default) maximises accuracy subject to saving at least
+#                       min_token_reduction percent. It lands at a cheaper operating
+#                       point - ~45% saved, 37.1% accuracy - which is a legitimate
+#                       result but a different one.
+#
+# Both are honest; they are different points on the same accuracy-versus-cost curve.
+# Reports must name which one they used, so this file exists to pin it down.
+rl:
+  selection:
+    objective: weighted_score

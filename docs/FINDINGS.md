@@ -4,6 +4,18 @@ Empirical results, including the ones that contradicted the original hypothesis.
 figures are on the held-out test split (599 questions, 4,000 traced in total) using
 `DeepSeek-R1-Distill-Qwen-1.5B` at a 768-token budget.
 
+**Reproduce every number below with:**
+
+```
+python scripts/run_phase5.py --experiment reported
+```
+
+That config differs from the default in one setting: the best DQN checkpoint is
+chosen on validation by `weighted_score` rather than `accuracy_at_budget`, which
+fixes the operating point at ~65% of tokens saved. The default lands at ~45%
+saved and 37.1% accuracy - a legitimate result, but a different point on the same
+curve. Figures quoted here are all at the 65% point unless stated otherwise.
+
 ---
 
 ## 1. Overthinking is real, and it costs accuracy
@@ -30,8 +42,11 @@ stops helping.
 
 | Policy | Accuracy | Mean tokens |
 |---|---|---|
-| Full reasoning | 42.4% | 533 |
+| Full reasoning | 40.6% | 538 |
 | Oracle (stops at the earliest correct step) | **62.9%** | **135** |
+
+Both rows are the 599 test questions. (Across all 4,000 traces full reasoning is
+42.4% at 533 tokens; the test split runs slightly harder.)
 
 This is not a trade-off. Stopping well would save ~75% of tokens *and* gain ~20
 accuracy points. That reframes the contribution: overthinking actively destroys
@@ -49,13 +64,15 @@ At matched cost (~65% of tokens saved):
 **+5.5 accuracy points at the same cost.** Fixed thresholds are what prior work
 actually uses, so this is the comparison the contribution rests on.
 
-A conservative operating point is also available: **24% fewer tokens for a 1-point
-accuracy cost** (39.6% vs 40.6%).
+Other operating points are available by moving the selection budget - see the
+frontier in section 5.
 
 ## 4. But reinforcement learning does *not* beat supervised imitation
 
 Compared at matched cost (~52% of tokens saved), selecting each on validation by
-"maximise accuracy subject to the cost budget":
+"maximise accuracy subject to the cost budget" - these two figures come from the
+reward-rebalancing run recorded in `artifacts/results/phase5_rebalance.json`, not
+from the `reported` config above:
 
 | Policy | Accuracy |
 |---|---|

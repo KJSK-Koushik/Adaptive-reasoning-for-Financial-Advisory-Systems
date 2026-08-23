@@ -1,0 +1,43 @@
+# ── 7B PILOT ─────────────────────────────────────────────────────────────
+# Paste as a NEW cell at the end of the Kaggle notebook and run it alone.
+# Everything above must already have run (project unpacked, deps installed).
+# Cost: ~1 hour on a single T4. Nothing is overwritten - the pilot only
+# writes artifacts/results/phase3_pilot.json.
+
+import json, pathlib, subprocess, sys
+
+# 7B in float16 needs ~14 GB, so it fits ONE T4 (16 GB) but not with a large
+# batch. Kaggle gives 2x T4; accelerate will shard if needed.
+pathlib.Path('configs/experiment').mkdir(parents=True, exist_ok=True)
+pathlib.Path('configs/experiment/pilot7b.yaml').write_text("""llm:
+  model_id: deepseek-ai/DeepSeek-R1-Distill-Qwen-7B
+  batch_size: 4
+  max_new_tokens: 1536
+
+traces:
+  step_tokens: 48
+  max_steps: 32
+  probe_max_tokens: 16
+  pilot:
+    n_questions: 50
+""")
+
+rc = subprocess.call([sys.executable, 'scripts/run_pilot.py', '--experiment', 'pilot7b'])
+print('\nexit code:', rc)
+
+# ── the numbers that decide the project ──────────────────────────────────
+p = json.load(open('artifacts/results/phase3_pilot.json'))
+print('\n' + '=' * 58)
+print('  7B PILOT vs 1.5B BASELINE')
+print('=' * 58)
+print(f"  accuracy            {p['accuracy']*100:5.1f}%      (1.5B was 52.0%)")
+print(f"  median tokens       {p['median_reasoning_tokens']:5.0f}       (1.5B was 524)")
+print(f"  truncation rate     {p['truncation_rate']*100:5.1f}%      (1.5B was 12.0%)")
+print(f"  tokens/second       {p['tokens_per_second']:5.1f}       (1.5B was 91.5)")
+print(f"  projected full run  {p['projected_phase3_hours']:5.1f} hours")
+print(f"  gate passed         {p['passed']}")
+print('=' * 58)
+print('\nDECISION RULE')
+print('  accuracy >= 65%  -> run the full 7B trace generation, 60-70% is reachable')
+print('  accuracy 55-65%  -> borderline; worth one full run if GPU quota allows')
+print('  accuracy <  55%  -> stay on 1.5B and spend the time on phases 7-8')
