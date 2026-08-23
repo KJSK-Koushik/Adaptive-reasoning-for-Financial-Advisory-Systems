@@ -60,7 +60,7 @@ accuracy, and good stopping recovers it.
 
 ## 3. Learned stopping clearly beats fixed-rule stopping
 
-At matched cost (~45% of tokens saved):
+At matched cost (~48% of tokens saved):
 
 | Policy | Accuracy |
 |---|---|
@@ -68,11 +68,11 @@ At matched cost (~45% of tokens saved):
 | Stop at a fixed token budget | 32.1% |
 | Confidence threshold | 30.2% |
 | Entropy threshold | 26.5% |
-| **Difficulty-aware DQN** | **39.2%** |
+| **Difficulty-aware DQN** | **40.1%** |
 
-**+7.2 accuracy points over a fixed step at the same cost** (95% CI +3.3 to +10.9,
-p = 0.0004). Confidence and entropy thresholds are what the early-exit literature
-actually uses, and the DQN beats both by more (+9.0 and +12.7). This is the comparison
+**+8.0 accuracy points over a fixed step at the same cost** (95% CI +4.2 to +11.8,
+p = 0.0001). Confidence and entropy thresholds are what the early-exit literature
+actually uses, and the DQN beats both by more (+9.9 and +13.5). This is the comparison
 the contribution rests on.
 
 ### The operating point is a choice, and it has to be stated
@@ -82,7 +82,7 @@ policy sits, and the two objectives land somewhere quite different:
 
 | Selection | Tokens saved | Accuracy | vs fixed step | vs behaviour cloning |
 |---|---|---|---|---|
-| `accuracy_at_budget` (reported) | 45% | **39.2%** | +7.2, p=0.0004 | +0.2, p=1.0 |
+| `accuracy_at_budget` (reported) | 48% | **40.1%** | +8.0, p=0.0001 | +1.3, p=0.47 |
 | `weighted_score` (aggressive) | 65% | 33.7% | +4.5, p=0.027 | -5.3, p=0.006 |
 
 The reported point states a budget. The aggressive one uses `accuracy + 0.30 x
@@ -95,12 +95,13 @@ arbitrary weight is not, so the reported figures use the former.
 
 | Policy | Accuracy | Tokens saved |
 |---|---|---|
-| Behaviour cloning (supervised) | 39.1% | **53.5%** |
-| DQN (reinforcement learning) | **39.2%** | 44.7% |
+| Behaviour cloning (supervised) | 38.7% | **52.8%** |
+| DQN (reinforcement learning) | **40.1%** | 47.8% |
 
-On accuracy this is a dead heat (+0.2 points, p = 1.0). But behaviour cloning reaches
-it **8.8 points of budget cheaper**, so it still edges the DQN on the trade-off rather
-than losing to it. Reporting the accuracy tie alone would flatter the DQN, which is
+The DQN is now 1.3 points ahead on accuracy, but the gap is not significant
+(p = 0.47) and behaviour cloning still spends **4.9 points of budget less**. Calling
+this a win for reinforcement learning would overstate it: the fair summary is that the
+two are level, with behaviour cloning slightly cheaper. Reporting the accuracy tie alone would flatter the DQN, which is
 why Phase 6 labels any comparison where the two policies spend differently.
 
 Behaviour cloning imitates the oracle and therefore has exactly one operating point;
@@ -131,8 +132,29 @@ from a hopeless one.** Measured as AUC for "would stopping here be correct":
 | entropy | 0.556 |
 | progress / doubt cues | 0.51-0.53 |
 | **all features combined** | **0.730** |
+| answer length, word count, is-a-value, repeat count | **added later - see below** |
 
-Almost all the signal is *question-level* (how hard is this question) rather than
+### The fix: what the answer *looks like*
+
+Acting on that, four features describing the **shape of the current answer** were
+added - its length, word count, whether it is a bare value rather than a sentence, and
+how many earlier steps held the same string. A model part-way through emits "the net
+change in repurchase reserves between 2008 and..." and a finished one emits "407
+million dollars", so the form of the string says more about whether it is done than
+confidence or entropy do.
+
+| State | AUC for "would stopping here be correct" |
+|---|---|
+| difficulty only (3 features) | 0.654 |
+| the original 14 features | 0.700 |
+| **plus answer shape (18 features)** | **0.767** |
+
+That is the largest single improvement found in the project, and it lifted the DQN
+from 39.2% to 40.1% while widening its margin over a fixed rule from +7.2 to +8.0
+points. All four are computable online from what the model has already produced.
+
+The original diagnosis still stands for the features available *before* that change:
+almost all the signal was *question-level* (how hard is this question) rather than
 *step-level* (is the answer right yet). At step 2 a recoverable question and a hopeless
 one look nearly identical, 63% of hard questions are never correct, and the network
 averages over them and concludes "stop".
@@ -174,9 +196,9 @@ The learned policy does the reverse:
 
 | Tier | Unaided reasoning | Stopped at | Share used | Accuracy |
 |---|---|---|---|---|
-| Easy | 427 tokens | 258 | **60%** | 83.7% |
-| Medium | 540 tokens | 264 | **49%** | 60.8% |
-| Hard | 585 tokens | 327 | **56%** | 12.3% |
+| Easy | 427 tokens | 234 | **55%** | 84.4% |
+| Medium | 540 tokens | 274 | **51%** | 57.6% |
+| Hard | 585 tokens | 303 | **52%** | 14.7% |
 
 At the reported operating point the allocation is close to flat - the budget is loose
 enough that the policy does not have to choose. At the aggressive point it becomes

@@ -1,7 +1,7 @@
 {
   "n_traces": 4000,
   "n_transitions": 91706,
-  "state_dim": 14,
+  "state_dim": 18,
   "token_budget": 768,
   "mean_oracle_return": 0.2472,
   "stop_reward_mean": -0.4738,

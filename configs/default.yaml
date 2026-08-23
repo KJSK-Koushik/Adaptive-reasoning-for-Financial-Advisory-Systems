@@ -217,6 +217,14 @@ rl:
     - progress_cue
     - doubt_cue
     - steps_since_answer_change
+    # The shape of the answer string itself. A model part-way through emits a sentence
+    # ("the net change between 2008 and...") and a finished one emits a value
+    # ("407 million dollars"), so these say more about whether it is done than
+    # confidence or entropy do - together they lift stop-correctness AUC 0.700 -> 0.767.
+    - answer_length
+    - answer_word_count
+    - answer_is_value
+    - answer_repeat_count
 
   reward:
     correct_bonus: 1.0        # alpha - reward for stopping on a correct answer

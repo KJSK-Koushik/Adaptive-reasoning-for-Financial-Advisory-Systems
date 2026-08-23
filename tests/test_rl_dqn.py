@@ -18,7 +18,18 @@ from adaptive_reasoning.rl.dqn import (
 )
 from adaptive_reasoning.rl.rollout import Trace
 
+# These tests build their own synthetic transitions, so they pin their own feature
+# count rather than tracking rl.state_features. The synthetic states carry signal in
+# one dimension only, so every extra dimension is noise for the network to fit; at the
+# production width it reliably collapses to a single action and the test then fails
+# for a reason that has nothing to do with training working.
 STATE_DIM = 14
+
+
+def _cfg(**dqn):
+    """Config narrowed to STATE_DIM features, with DQN settings overridden."""
+    features = load_config().rl.state_features[:STATE_DIM]
+    return load_config(overrides={"rl": {"state_features": features, "dqn": dqn}})
 
 
 @pytest.fixture
@@ -133,7 +144,7 @@ def test_buffer_sampling_is_reproducible():
 # --------------------------------------------------------------------------- #
 def test_training_learns_the_structure(cfg):
     """Stopping is rewarded from step 2 on; the network should pick that up."""
-    tuned = load_config(overrides={"rl": {"dqn": {"train_steps": 600, "eval_every": 10_000}}})
+    tuned = _cfg(train_steps=600, eval_every=10_000)
     net, _, _ = train(_frame(60), tuned)
     balance = action_balance(net, np.vstack([np.asarray(s, np.float32)
                                              for s in _frame(20).state]))
@@ -141,7 +152,7 @@ def test_training_learns_the_structure(cfg):
 
 
 def test_training_is_deterministic(cfg):
-    tuned = load_config(overrides={"rl": {"dqn": {"train_steps": 200, "eval_every": 10_000}}})
+    tuned = _cfg(train_steps=200, eval_every=10_000)
     a, _, _ = train(_frame(20), tuned)
     b, _, _ = train(_frame(20), tuned)
     for pa, pb in zip(a.parameters(), b.parameters(), strict=True):
