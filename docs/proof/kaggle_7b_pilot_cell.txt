@@ -10,30 +10,57 @@ from pathlib import Path
 WORK, INPUT = Path('/kaggle/working'), Path('/kaggle/input')
 PROJECT = WORK / 'project'
 
-# 1. locate the project root - the directory holding configs/default.yaml
-found = glob.glob(str(WORK / '**' / 'configs' / 'default.yaml'), recursive=True)
-if found:
-    root = Path(found[0]).parent.parent
-    print(f'using project already in working dir: {root}')
-else:
+# 1. locate the project root - the directory holding configs/default.yaml.
+#    A Kaggle dataset is versioned and a notebook stays pinned to the version it was
+#    attached at, so an old copy can easily still be sitting in /kaggle/input after an
+#    upload. Prefer a tree that actually contains the fix, and say so if none does.
+def _has_fix(root):
+    cfg = Path(root) / "src" / "adaptive_reasoning" / "config.py"
+    return cfg.exists() and "device_map" in cfg.read_text(encoding="utf-8")
+
+
+candidates = []
+for marker in glob.glob(str(WORK / '**' / 'configs' / 'default.yaml'), recursive=True):
+    candidates.append(Path(marker).parent.parent)
+
+if not candidates:
     zips = glob.glob(str(INPUT / '**' / 'adaptive-reasoning.zip'), recursive=True)
     marks = glob.glob(str(INPUT / '**' / 'configs' / 'default.yaml'), recursive=True)
     if zips:
         print(f'unpacking {zips[0]}')
         with zipfile.ZipFile(zips[0]) as zf:
             zf.extractall(WORK)
-        found = glob.glob(str(WORK / '**' / 'configs' / 'default.yaml'), recursive=True)
-        root = Path(found[0]).parent.parent
+        candidates = [Path(m).parent.parent for m in
+                      glob.glob(str(WORK / '**' / 'configs' / 'default.yaml'), recursive=True)]
     elif marks:
-        src = Path(marks[0]).parent.parent
-        print(f'copying project from {src}')
+        sources = [Path(m).parent.parent for m in marks]
+        pick = next((s for s in sources if _has_fix(s)), sources[0])
+        print(f'copying project from {pick}')
         if PROJECT.exists():
             shutil.rmtree(PROJECT)
-        shutil.copytree(src, PROJECT)
-        root = PROJECT
+        shutil.copytree(pick, PROJECT)
+        candidates = [PROJECT]
     else:
         raise SystemExit('No project found. Attach the adaptive-reasoning-fas dataset '
                          'in the sidebar under Input, then re-run this cell.')
+
+root = next((c for c in candidates if _has_fix(c)), None)
+if root is None:
+    print('Found a project at:', candidates[0])
+    raise SystemExit(
+        """
+        This is an OLD version of the dataset - it has no llm.device_map, so a 7B
+        model cannot be loaded (it would be built in CPU RAM and stall at ~42%).
+
+        Kaggle pins a notebook to the dataset version it was attached at, so a new
+        upload does not move it. To fix:
+
+          1. sidebar -> Input -> remove adaptive-reasoning-fas
+          2. Add Input -> your Datasets -> adaptive-reasoning-fas (latest version)
+          3. re-run this cell
+        """
+    )
+print('using project:', root)
 
 os.chdir(root)
 print('working directory:', os.getcwd())
