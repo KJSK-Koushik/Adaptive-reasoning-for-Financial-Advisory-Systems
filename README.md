@@ -57,7 +57,7 @@ tests/                    pytest suite
 | 4 | Offline RL environment | **complete** — 91,706 transitions |
 | 5 | DQN training | **complete** — see docs/FINDINGS.md |
 | 6 | Baselines and evaluation | **complete** - see artifacts/results/phase6_summary.json |
-| 7 | Real-time inference controller | not started |
+| 7 | Real-time inference controller | **complete** - verified identical to the offline evaluation |
 | 8 | Financial advisory application | not started |
 | 9 | Ablations and final results | not started |
 
