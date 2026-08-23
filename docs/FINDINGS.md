@@ -84,6 +84,54 @@ This is not a trade-off. Stopping well would save ~75% of tokens *and* gain ~21
 accuracy points. That reframes the contribution: overthinking actively destroys
 accuracy, and good stopping recovers it.
 
+## 7. Ablations: difficulty-awareness does not help, and removing it helps
+
+Every result above compares the whole system against baselines, which cannot separate
+"difficulty-awareness helps" from "any learned policy helps". Phase 9 removes each
+ingredient and retrains from scratch. All five variants are measured against the same
+fixed-step baseline (32.1%) at nearly the same operating point, so the margin column is
+directly comparable.
+
+| Variant | Accuracy | Tokens saved | Margin over fixed step | vs the full system |
+|---|---|---|---|---|
+| full - the reported system | 40.1% | 47.8% | +8.0 | - |
+| **no difficulty in the state** | **44.1%** | 46.6% | **+12.0** | **+4.0, p = 0.018** |
+| **difficulty-blind entirely** | **43.9%** | 44.4% | **+11.9** | **+3.8, p = 0.024** |
+| uniform token price | 41.4% | 46.2% | +9.3 | +1.3, p = 0.44 |
+| without answer-shape features | 39.2% | 44.7% | +7.2 | -0.8, p = 0.67 |
+
+**Removing difficulty from the state makes the policy significantly better**, by 4
+accuracy points. Removing it from the reward as well changes nothing further. The
+difficulty-aware formulation - the project's stated novelty - is not contributing; it
+is costing about four points.
+
+### Why
+
+The policy does not see *measured* difficulty. It sees the Phase 2 classifier's
+prediction, because that is all a live system could have. That classifier scores 59.9%
+against a 55.6% majority baseline, with 16.7% recall on the medium class - it is barely
+better than guessing "hard" every time. Three of the eighteen state dimensions are
+therefore close to noise, and the network pays for them.
+
+The reward ablation is the cleaner test of the idea itself, because the reward uses the
+*measured* label rather than the prediction. Making the token price uniform changed
+accuracy by 1.3 points, which is not significant (p = 0.44). So even with a perfect
+difficulty signal in the reward, difficulty-aware pricing did not earn its place here.
+
+### What survives
+
+The central result is unaffected, and in fact stronger: **a learned stopping policy
+beats fixed and threshold rules at matched cost.** The best configuration found is the
+difficulty-blind one, at **+12.0 points over a fixed step** rather than +8.0.
+
+### A correction
+
+An earlier version of this document called the answer-shape features "the largest
+single improvement in the project". They lift stop-correctness AUC from 0.700 to 0.767,
+which is real, but the ablation puts their effect on final accuracy at 0.8 points and
+not significant (p = 0.67). The AUC gain did not translate.
+
+
 ## 3. Learned stopping clearly beats fixed-rule stopping
 
 At matched cost (~48% of tokens saved):

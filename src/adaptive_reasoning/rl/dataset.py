@@ -157,8 +157,13 @@ def recompute_rewards(frame, cfg: Config, budget: int):
     return frame
 
 
-def build(cfg: Config, write: bool = True) -> dict:
-    """Build the full transition table from ``traces.parquet``."""
+def build_frame(cfg: Config):
+    """Build the transition table in memory, and return it with its summary.
+
+    Separate from :func:`build` so that an experiment which must *not* disturb the
+    saved artefacts - the Phase 9 ablations rebuild the table several times with
+    different difficulty settings - can have the data without writing it.
+    """
     import pandas as pd
 
     from ..difficulty.from_traces import observed_budget
@@ -216,6 +221,13 @@ def build(cfg: Config, write: bool = True) -> dict:
         "by_split": frame.groupby("split").size().to_dict(),
         "by_difficulty": frame.groupby("difficulty").size().to_dict(),
     }
+
+    return frame, summary_stats
+
+
+def build(cfg: Config, write: bool = True) -> dict:
+    """Build the full transition table from ``traces.parquet``, and save it."""
+    frame, summary_stats = build_frame(cfg)
 
     if write:
         paths.TRACES.mkdir(parents=True, exist_ok=True)
