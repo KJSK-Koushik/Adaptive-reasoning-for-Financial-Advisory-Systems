@@ -59,6 +59,12 @@ VARIANTS = {
         "easy": UNIFORM_COST, "medium": UNIFORM_COST, "hard": UNIFORM_COST}}}},
     "neither": {"rl": {"difficulty_source": "none", "reward": {"token_cost": {
         "easy": UNIFORM_COST, "medium": UNIFORM_COST, "hard": UNIFORM_COST}}}},
+    # Diagnostic, not deployable: the *measured* difficulty label in the state. A
+    # live system cannot have this - it is what Phase 2's classifier is trying to
+    # approximate - so it is an upper bound on what any difficulty signal could buy.
+    # If even this does not beat the difficulty-blind policy, the idea does not work
+    # here and a better classifier would not rescue it.
+    "oracle_difficulty": {"rl": {"difficulty_source": "true"}},
     "no_answer_shape": {"rl": {"state_features": [
         "difficulty_easy", "difficulty_medium", "difficulty_hard", "confidence",
         "min_token_confidence", "entropy", "entropy_slope", "token_ratio",
@@ -71,6 +77,7 @@ DESCRIPTIONS = {
     "no_state": "policy cannot see difficulty",
     "no_reward": "one token price for every tier",
     "neither": "difficulty-blind entirely",
+    "oracle_difficulty": "PERFECT difficulty in the state (not deployable)",
     "no_answer_shape": "without the answer-shape features",
 }
 

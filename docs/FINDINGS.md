@@ -118,6 +118,31 @@ The reward ablation is the cleaner test of the idea itself, because the reward u
 accuracy by 1.3 points, which is not significant (p = 0.44). So even with a perfect
 difficulty signal in the reward, difficulty-aware pricing did not earn its place here.
 
+### Could a better difficulty classifier rescue it? No.
+
+The obvious objection to the above is that the policy only sees a 59.9% classifier, so
+perhaps the idea is sound and the signal is the problem. That is testable: put the
+*measured* difficulty label in the state. It is not deployable - a live system cannot
+know it, and approximating it is precisely the classifier's job - but it is an upper
+bound on what any difficulty signal could ever buy.
+
+| Variant | Accuracy | Tokens saved | Margin over fixed step |
+|---|---|---|---|
+| difficulty-blind | 44.1% | 46.6% | **+12.0** |
+| **perfect difficulty in the state** | 43.6% | 52.7% | **+11.8** |
+| predicted difficulty (the reported system) | 40.1% | 47.8% | +8.0 |
+
+**A perfect difficulty signal performs the same as no difficulty signal at all**
+(+11.8 against +12.0). Handed the exact label it was trying to predict, the policy gains
+nothing in accuracy. So the noisy classifier is not the bottleneck and improving it
+would not change the conclusion: on this data, conditioning the stopping decision on
+question difficulty does not help.
+
+One honest nuance: the oracle variant reaches its margin at a *cheaper* operating point
+(52.7% of tokens saved against 46.6%), so perfect difficulty does buy something - about
+six points of budget at equal accuracy advantage. That is a real but small effect, and
+it is not the claim the project was making.
+
 ### What survives
 
 The central result is unaffected, and in fact stronger: **a learned stopping policy
