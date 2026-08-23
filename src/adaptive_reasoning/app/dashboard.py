@@ -37,9 +37,28 @@ TOKENS_PER_SECOND = 91.5     # measured by the Phase 3 pilot on a Kaggle T4
 POLICY_NAMES = {"dqn": "Difficulty-aware DQN", "bc": "Behaviour cloning"}
 
 
+def _artifact_stamp() -> tuple:
+    """Modification times of everything the store loads.
+
+    Passing this as a cache key means retraining a policy or re-grading the traces
+    invalidates the cache by itself. Without it Streamlit happily serves whatever it
+    loaded at startup - which twice meant the dashboard showing results that no longer
+    matched the code, the worst possible failure for something used to demonstrate.
+    """
+    from adaptive_reasoning import paths
+
+    watched = (paths.UNIFIED_DATASET, paths.TRACE_DATASET, paths.RL_TRANSITIONS,
+               paths.DQN_POLICY, paths.MODELS / "behaviour_cloning.joblib")
+    return tuple(p.stat().st_mtime_ns if p.exists() else 0 for p in watched)
+
+
 @st.cache_resource(show_spinner="Loading traces and policies ...")
-def _store(experiment: str = "reported") -> DemoStore:
+def _load_store(experiment: str, stamp: tuple) -> DemoStore:
     return DemoStore(load_config(experiment))
+
+
+def _store(experiment: str = "reported") -> DemoStore:
+    return _load_store(experiment, _artifact_stamp())
 
 
 def _run(store: DemoStore, question_id: str, policy_name: str):
