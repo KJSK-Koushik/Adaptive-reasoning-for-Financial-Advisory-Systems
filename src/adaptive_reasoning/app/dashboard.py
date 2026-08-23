@@ -2,13 +2,14 @@
 
     streamlit run src/adaptive_reasoning/app/dashboard.py
 
-Shows the thing the project is about: the model reasoning step by step, the policy
-deciding when to stop, and what that decision cost or saved. The reasoning is replayed
-from the Phase 3 recordings, so it runs instantly on a laptop with no GPU - and it goes
-through the Phase 7 controller, the same code that would drive a live model.
+One screen, one story: the model was asked a question, the policy stopped it early,
+here is what that cost or saved. Everything else is behind an expander, because a
+reviewer looking at this for the first time should not have to decide what matters.
 
-It talks to the controller directly rather than over HTTP. A demonstration that depends
-on a separate server process is a demonstration that can fail in the room.
+The reasoning is replayed from the Phase 3 recordings, so it runs instantly with no
+GPU, and it goes through the Phase 7 controller - the same code that would drive a live
+model. It calls the controller directly rather than over HTTP: a demonstration that
+depends on a second process starting is one that can fail in the room.
 """
 
 from __future__ import annotations
@@ -33,6 +34,8 @@ from adaptive_reasoning.serve.controller import (  # noqa: E402
 
 TOKENS_PER_SECOND = 91.5     # measured by the Phase 3 pilot on a Kaggle T4
 
+POLICY_NAMES = {"dqn": "Difficulty-aware DQN", "bc": "Behaviour cloning"}
+
 
 @st.cache_resource(show_spinner="Loading traces and policies ...")
 def _store(experiment: str = "reported") -> DemoStore:
@@ -53,120 +56,104 @@ def _run(store: DemoStore, question_id: str, policy_name: str):
 
 def main() -> None:
     cfg = load_config("reported")
-    st.set_page_config(page_title=cfg.app.title, page_icon="||", layout="wide")
+    st.set_page_config(page_title=cfg.app.title, layout="wide")
     store = _store()
 
-    st.title(cfg.app.title)
-    st.caption("Adaptive reasoning termination — the system decides when the model has "
-               "thought long enough.")
+    st.title("Adaptive Financial Advisory")
+    st.caption("The system decides when the model has thought long enough.")
 
-    # -- sidebar: pick a question ------------------------------------------- #
+    # -- pick a question ----------------------------------------------------- #
     with st.sidebar:
-        st.header("Question")
-        policy_name = st.radio(
-            "Stopping policy",
-            sorted(store.policies),
-            format_func=lambda k: {"dqn": "Difficulty-aware DQN",
-                                   "bc": "Behaviour cloning"}.get(k, k),
-            help="Both were trained in Phase 5 and evaluated in Phase 6.",
-        )
-
+        st.subheader("Choose a question")
         frame = store.questions[store.questions.index.isin(store.test_ids)]
-        domains = ["all"] + sorted(frame.domain.unique().tolist())
-        domain = st.selectbox("Domain", domains)
+
+        domain = st.selectbox("Topic",
+                              ["all"] + sorted(frame.domain.unique().tolist()))
         if domain != "all":
             frame = frame[frame.domain == domain]
 
         options = frame.head(200).index.tolist()
         if not options:
-            st.error("No traced questions for that domain.")
+            st.error("No questions for that topic.")
             st.stop()
         question_id = st.selectbox(
             "Question", options,
-            format_func=lambda q: str(frame.loc[q, "question"])[:70] + " ...",
+            format_func=lambda q: str(frame.loc[q, "question"])[:60] + " ...",
         )
-        st.divider()
-        st.caption(f"{len(store.traced_ids):,} traced questions · "
-                   f"budget {store.budget} tokens")
+
+        st.subheader("Stopping policy")
+        policy_name = st.radio(
+            "policy", sorted(store.policies),
+            format_func=lambda k: POLICY_NAMES.get(k, k),
+            label_visibility="collapsed",
+        )
 
     row = store.questions.loc[question_id]
-
-    st.subheader("Question")
-    st.write(str(row.question))
-    if str(row.context or "").strip():
-        with st.expander("Context provided to the model"):
-            st.text(str(row.context)[:4000])
-
     adaptive, full = _run(store, question_id, policy_name)
     was_right = store.correct_at.get((question_id, adaptive.stop_step))
     full_right = store.correct_at.get((question_id, full.stop_step))
     saved = full.tokens_used - adaptive.tokens_used
     pct = 100.0 * saved / max(full.tokens_used, 1)
 
-    # -- the answer ---------------------------------------------------------- #
-    st.subheader("Answer")
+    # -- the question -------------------------------------------------------- #
+    st.markdown(f"#### {row.question}")
+
+    # -- the answer, side by side -------------------------------------------- #
     left, right = st.columns(2)
     with left:
-        st.markdown("**With adaptive stopping**")
-        # A bare conditional expression would leave a DeltaGenerator on the line,
-        # which Streamlit's magic then renders as a block of repr text.
+        st.caption(f"STOPPED EARLY  ·  {adaptive.tokens_used} tokens")
         if was_right:
-            st.success(adaptive.answer)
+            st.success(f"{adaptive.answer}\n\n**Correct**")
         else:
-            st.warning(adaptive.answer)
-        st.caption(f"stopped at step {adaptive.stop_step} · {adaptive.tokens_used} tokens "
-                   f"· {'correct' if was_right else 'incorrect'}")
+            st.error(f"{adaptive.answer}\n\n**Incorrect**")
     with right:
-        st.markdown("**With full reasoning**")
+        st.caption(f"FULL REASONING  ·  {full.tokens_used} tokens")
         if full_right:
-            st.success(full.answer)
+            st.success(f"{full.answer}\n\n**Correct**")
         else:
-            st.warning(full.answer)
-        st.caption(f"ran to step {full.stop_step} · {full.tokens_used} tokens "
-                   f"· {'correct' if full_right else 'incorrect'}")
+            st.error(f"{full.answer}\n\n**Incorrect**")
 
     if was_right and not full_right:
-        st.info("Stopping early produced the **correct** answer where full reasoning "
-                "did not — the model had it, then talked itself out of it.")
+        st.info("**The model had it, then talked itself out of it.** Stopping early "
+                "got the right answer; thinking longer lost it.")
     elif full_right and not was_right:
-        st.warning("Stopping early cost the correct answer on this question.")
+        st.warning("On this question, stopping early was too soon.")
 
-    # -- what it saved ------------------------------------------------------- #
-    if cfg.app.show_savings_panel:
-        st.subheader("What early stopping saved")
-        a, b, c, d = st.columns(4)
-        a.metric("Tokens used", f"{adaptive.tokens_used}",
-                 delta=f"-{saved}", delta_color="inverse")
-        b.metric("Reasoning saved", f"{pct:.0f}%")
-        c.metric("Latency", f"{adaptive.tokens_used / TOKENS_PER_SECOND:.2f}s",
-                 delta=f"-{saved / TOKENS_PER_SECOND:.2f}s", delta_color="inverse")
-        d.metric("Stopped because", adaptive.stop_reason.replace("_", " "))
+    # -- the saving ---------------------------------------------------------- #
+    a, b, c = st.columns(3)
+    a.metric("Reasoning saved", f"{pct:.0f}%")
+    b.metric("Tokens", f"{adaptive.tokens_used}", delta=f"{-saved}",
+             delta_color="inverse")
+    c.metric("Time", f"{adaptive.tokens_used / TOKENS_PER_SECOND:.1f}s",
+             delta=f"-{saved / TOKENS_PER_SECOND:.1f}s", delta_color="inverse")
 
-    # -- the reasoning, step by step ----------------------------------------- #
-    if cfg.app.show_reasoning_trace:
-        st.subheader("The decision at every step")
-        st.caption("The policy sees confidence, entropy and answer stability at each "
-                   "boundary, and chooses CONTINUE or STOP.")
-        rows = [
+    # -- how it decided ------------------------------------------------------ #
+    st.markdown("##### How it decided")
+    st.dataframe(
+        [
             {
-                "step": d.step_index,
-                "tokens": d.tokens_so_far,
-                "confidence": round(d.confidence, 3),
-                "entropy": round(d.entropy, 3),
-                "answer so far": d.answer[:60],
-                "decision": "STOP" if d.stopped else "continue",
+                "Step": d.step_index + 1,
+                "Tokens": d.tokens_so_far,
+                "Confidence": f"{d.confidence:.0%}",
+                "Answer at this point": d.answer[:55],
+                "Decision": "STOP  ←" if d.stopped else "keep thinking",
             }
             for d in adaptive.decisions
-        ]
-        st.dataframe(rows, width="stretch", hide_index=True)
+        ],
+        width="stretch", hide_index=True,
+    )
 
-        with st.expander("Reasoning text the model produced"):
-            for d in adaptive.decisions:
-                st.markdown(f"**Step {d.step_index}** · {d.tokens_so_far} tokens")
-                st.text(d.step_text[:800] or "(no text recorded)")
+    # -- everything else, folded away ---------------------------------------- #
+    if str(row.context or "").strip():
+        with st.expander("Source document given to the model"):
+            st.text(str(row.context)[:4000])
 
-    # -- headline evaluation ------------------------------------------------- #
-    with st.expander("How this performs overall (599 held-out test questions)"):
+    with st.expander("The model's reasoning, step by step"):
+        for d in adaptive.decisions:
+            st.markdown(f"**Step {d.step_index + 1}**")
+            st.text(d.step_text[:800] or "(no text recorded)")
+
+    with st.expander("Overall results on 599 unseen questions"):
         import json
 
         from adaptive_reasoning import paths
@@ -174,23 +161,28 @@ def main() -> None:
         summary = paths.RESULTS / "phase6_summary.json"
         if summary.exists():
             data = json.loads(summary.read_text(encoding="utf-8"))["results"]
-            table = [
-                {"policy": name.replace("_", " "),
-                 "accuracy": f"{data[name]['accuracy']:.1%}",
-                 "mean tokens": f"{data[name]['mean_tokens']:.0f}",
-                 "tokens saved": f"{data[name]['token_reduction_pct']:.1f}%"}
-                for name in ("full_reasoning", "fixed_step_matched",
-                             "behaviour_cloning", "dqn", "oracle")
-                if name in data
-            ]
-            st.dataframe(table, width="stretch", hide_index=True)
-            st.caption("Fixed step is the standard approach in prior work, matched to "
-                       "the same token budget. Oracle is an upper bound that uses "
-                       "hindsight and is not implementable.")
+            labels = {
+                "full_reasoning": "Full reasoning (no early stop)",
+                "fixed_step_matched": "Fixed rule, same budget",
+                "behaviour_cloning": "Behaviour cloning",
+                "dqn": "Difficulty-aware DQN",
+                "oracle": "Best possible (uses hindsight)",
+            }
+            st.dataframe(
+                [
+                    {"Method": labels[name],
+                     "Accuracy": f"{data[name]['accuracy']:.1%}",
+                     "Tokens": f"{data[name]['mean_tokens']:.0f}",
+                     "Saved": f"{data[name]['token_reduction_pct']:.0f}%"}
+                    for name in labels if name in data
+                ],
+                width="stretch", hide_index=True,
+            )
+            st.caption("At the same token budget the DQN beats the fixed rule by 7.2 "
+                       "points. The last row is an upper bound, not a method.")
         else:
-            st.info("Run scripts/run_phase6.py to populate this table.")
+            st.info("Run scripts/run_phase6.py to fill this in.")
 
-    st.divider()
     st.caption(adaptive.disclaimer)
 
 
