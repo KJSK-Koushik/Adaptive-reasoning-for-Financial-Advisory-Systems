@@ -1,5 +1,5 @@
 # ── PHASE 3 RERUN: longer budget + worked examples ───────────────────────
-# Paste as a NEW cell at the end of the Kaggle notebook.
+# Paste as the ONLY cell in a fresh Kaggle notebook.
 #
 # Run it with "Save Version -> Save & Run All (Commit)", NOT interactively.
 # An interactive kernel restart wipes /kaggle/working and takes every
@@ -15,8 +15,13 @@
 #                      unfinished sum rather than a value. Two worked examples
 #                      demonstrate the answer contract the system prompt states.
 #
-# Cost: ~9 hours for 4,000 questions. Checkpoints every 200 traces, so an
-# interrupted run resumes rather than restarting.
+# Cost: ~6 hours for 4,000 questions at batch 32. Checkpoints every 200 traces,
+# so an interrupted run resumes rather than restarting.
+#
+# PASTE THIS AS THE ONLY CELL IN A FRESH NOTEBOOK. Save & Run All executes every
+# cell in the notebook, and a leftover cell from an earlier experiment will run
+# too - one already cost a 3h43m run that failed on a stale cell after
+# regenerating traces that already existed.
 
 import glob, json, os, shutil, subprocess, sys
 from pathlib import Path
@@ -83,7 +88,7 @@ Path('configs/experiment').mkdir(parents=True, exist_ok=True)
 Path('configs/experiment/run2.yaml').write_text("""llm:
   model_id: deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B
   device_map: auto
-  batch_size: 16
+  batch_size: 32
   max_new_tokens: 1536
 
 prompting:
@@ -113,7 +118,7 @@ print('\nexit code:', rc)
 out = Path('artifacts/results/phase3_summary.json')
 if rc != 0 or not out.exists():
     raise SystemExit(f'Phase 3 did not finish (exit {rc}). Read the error above. '
-                     'Out-of-memory: lower batch_size to 8.')
+                     'Out-of-memory: lower batch_size to 24.')
 
 s = json.loads(out.read_text())
 print('\n' + '=' * 60)
