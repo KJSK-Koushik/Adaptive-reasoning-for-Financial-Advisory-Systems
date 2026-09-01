@@ -1,0 +1,130 @@
+# ── PHASE 3 RERUN: longer budget + worked examples ───────────────────────
+# Paste as a NEW cell at the end of the Kaggle notebook.
+#
+# Run it with "Save Version -> Save & Run All (Commit)", NOT interactively.
+# An interactive kernel restart wipes /kaggle/working and takes every
+# checkpoint with it; that has happened once already on this project.
+#
+# Two changes from the traces we have now, both aimed at answers the model got
+# right and then failed to deliver:
+#
+#   1536-token budget  25% of traces currently stop mid-calculation at 768
+#                      tokens, and those score 30.7% against 48.9% for traces
+#                      that finish.
+#   few-shot prompting 23% of wrong numeric answers are a sentence or an
+#                      unfinished sum rather than a value. Two worked examples
+#                      demonstrate the answer contract the system prompt states.
+#
+# Cost: ~9 hours for 4,000 questions. Checkpoints every 200 traces, so an
+# interrupted run resumes rather than restarting.
+
+import glob, json, os, shutil, subprocess, sys
+from pathlib import Path
+
+REPO = 'https://github.com/KJSK-Koushik/Adaptive-reasoning-for-Financial-Advisory-Systems.git'
+WORK, INPUT = Path('/kaggle/working'), Path('/kaggle/input')
+PROJECT, FRESH = WORK / 'project', WORK / '_repo'
+
+# A previous run may have left the kernel inside a directory this cell deletes.
+os.chdir(WORK)
+
+# ── 1. data, from the attached dataset ───────────────────────────────────
+found = glob.glob(str(INPUT / '**' / 'data' / 'processed' / 'unified.parquet'),
+                  recursive=True)
+if not found:
+    raise SystemExit('unified.parquet not found. Sidebar -> Add Input -> your '
+                     'Datasets -> adaptive-reasoning-fas, then re-run this cell.')
+data_root = Path(found[0]).parent.parent.parent
+print('data from:', data_root)
+
+if PROJECT.exists():
+    shutil.rmtree(PROJECT)
+PROJECT.mkdir(parents=True)
+shutil.copytree(data_root / 'data', PROJECT / 'data')
+
+# ── 2. code, fresh from GitHub ───────────────────────────────────────────
+if FRESH.exists():
+    shutil.rmtree(FRESH)
+print('cloning the current code ...')
+subprocess.check_call(['git', 'clone', '--depth', '1', '--quiet', REPO, str(FRESH)],
+                      cwd=str(WORK))
+for part in ('src', 'scripts', 'configs'):
+    shutil.copytree(FRESH / part, PROJECT / part)
+for f in ('requirements.txt', 'requirements-gpu.txt', 'pyproject.toml'):
+    if (FRESH / f).exists():
+        shutil.copy2(FRESH / f, PROJECT / f)
+
+commit = subprocess.run(['git', '-C', str(FRESH), 'log', '-1', '--format=%h %s'],
+                        capture_output=True, text=True, cwd=str(WORK)).stdout.strip()
+print('code at commit:', commit)
+
+os.chdir(PROJECT)
+print('working directory:', os.getcwd())
+
+# Both changes live in the cloned code. If either is missing the dataset or the
+# clone is stale, and a nine-hour run would produce the traces we already have.
+cfg_src = Path('src/adaptive_reasoning/config.py').read_text(encoding='utf-8')
+prompt_src = Path('src/adaptive_reasoning/prompting.py').read_text(encoding='utf-8')
+assert 'few_shot' in cfg_src, 'cloned code has no prompting.few_shot - clone is stale'
+assert 'FEW_SHOT' in prompt_src, 'cloned code has no worked examples - clone is stale'
+print('few-shot prompting available: True')
+
+# ── 3. dependencies ──────────────────────────────────────────────────────
+try:
+    import torch, transformers  # noqa: F401
+    print('dependencies already present')
+except ImportError:
+    print('installing dependencies (a few minutes) ...')
+    subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-q',
+                           '-r', 'requirements.txt'])
+
+# ── 4. the run configuration ─────────────────────────────────────────────
+Path('configs/experiment').mkdir(parents=True, exist_ok=True)
+Path('configs/experiment/run2.yaml').write_text("""llm:
+  model_id: deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B
+  device_map: auto
+  batch_size: 16
+  max_new_tokens: 1536
+
+prompting:
+  few_shot: true
+
+traces:
+  n_questions: 4000
+  step_tokens: 48
+  max_steps: 32
+  probe_max_tokens: 24
+  checkpoint_every: 200
+""")
+print(Path('configs/experiment/run2.yaml').read_text())
+
+# ── 5. gate, then the run ────────────────────────────────────────────────
+# The pilot refuses to let the long run start if the model is not reasoning at
+# length. It costs two minutes and has already caught one wasted run.
+rc = subprocess.call([sys.executable, 'scripts/run_pilot.py', '--experiment', 'run2'])
+if rc != 0:
+    raise SystemExit(f'Pilot gate failed (exit {rc}). Do not start the long run.')
+
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
+rc = subprocess.call([sys.executable, 'scripts/run_phase3.py', '--experiment', 'run2'])
+print('\nexit code:', rc)
+
+# ── 6. what changed ──────────────────────────────────────────────────────
+out = Path('artifacts/results/phase3_summary.json')
+if rc != 0 or not out.exists():
+    raise SystemExit(f'Phase 3 did not finish (exit {rc}). Read the error above. '
+                     'Out-of-memory: lower batch_size to 8.')
+
+s = json.loads(out.read_text())
+print('\n' + '=' * 60)
+print('  RUN 2 vs THE TRACES WE HAVE')
+print('=' * 60)
+print(f"  traces               {s['n_traces']:6,}      (was 4,000)")
+print(f"  final accuracy       {s['final_accuracy']*100:6.1f}%     (was 44.3%)")
+print(f"  correct at any point {s['solvable_fraction']*100:6.1f}%     (was 65.5%)")
+print(f"  mean tokens          {s['mean_total_tokens']:6.0f}      (was 533)")
+print(f"  mean steps           {s['mean_steps']:6.1f}      (was 11.5)")
+print('=' * 60)
+print('\nfinal accuracy above ~47% means the changes worked.')
+print('Then: run the packaging cell, download phase3_results.zip, and unzip it')
+print('over the project root locally.')
