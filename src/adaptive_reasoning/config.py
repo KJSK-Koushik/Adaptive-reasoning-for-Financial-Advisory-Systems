@@ -135,6 +135,13 @@ class PilotCfg(_Base):
     min_answer_rate: float = Field(ge=0.0, le=1.0)
 
 
+class PromptingCfg(_Base):
+    # Worked examples cost a little prompt length on every question and buy answer-
+    # format compliance. Off by default so the original zero-shot runs stay
+    # reproducible; the comparison between the two is itself a result.
+    few_shot: bool = False
+
+
 class TracesCfg(_Base):
     n_questions: int
     step_tokens: int
@@ -239,6 +246,7 @@ class Config(_Base):
     data: DataCfg
     difficulty: DifficultyCfg
     llm: LLMCfg
+    prompting: PromptingCfg = Field(default_factory=PromptingCfg)
     traces: TracesCfg
     rl: RLCfg
     eval: EvalCfg

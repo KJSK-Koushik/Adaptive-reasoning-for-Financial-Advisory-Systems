@@ -143,6 +143,14 @@ llm:
   top_p: 0.95
   batch_size: 8
 
+prompting:
+  # Prepend two invented worked examples showing the required answer format. They cost
+  # a little prompt length on every question and buy format compliance: on the
+  # zero-shot 768-token traces, 23% of wrong numeric answers were a sentence or an
+  # unfinished calculation rather than a value. Off by default so the original runs
+  # stay reproducible.
+  few_shot: false
+
 traces:
   # How many unified-schema questions actually get traced. The rest stay as
   # held-out evaluation data. Trace generation is the only expensive step.

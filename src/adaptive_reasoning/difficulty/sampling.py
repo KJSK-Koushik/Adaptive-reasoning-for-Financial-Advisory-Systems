@@ -83,7 +83,7 @@ def sample_questions(
     prompts: list[str] = []
     owners: list[QARecord] = []
     for record in todo:
-        rendered = llm.render(build_messages(record))
+        rendered = llm.render(build_messages(record, cfg.prompting.few_shot))
         for _ in range(k):
             prompts.append(rendered)
             owners.append(record)

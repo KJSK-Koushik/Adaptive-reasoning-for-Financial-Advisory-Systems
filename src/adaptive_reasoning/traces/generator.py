@@ -242,7 +242,8 @@ class TraceGenerator:
         cfg = self.cfg
         batch = len(records)
 
-        prompts = [self.llm.render(build_messages(r)) for r in records]
+        few_shot = self.cfg.prompting.few_shot
+        prompts = [self.llm.render(build_messages(r, few_shot)) for r in records]
         encoded = self.tokenizer(prompts, return_tensors="pt", padding=True)
         input_ids = encoded.input_ids.to(self.device)
         attention_mask = encoded.attention_mask.to(self.device)

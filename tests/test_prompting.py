@@ -4,6 +4,7 @@ import pytest
 
 from adaptive_reasoning.prompting import (
     ANSWER_MARKER,
+    FEW_SHOT,
     build_messages,
     build_user_prompt,
     extract_answer,
@@ -110,3 +111,48 @@ def test_extraction_feeds_grading_correctly():
         "Final answer: yes"
     )
     assert is_correct(extract_answer(completion), "yes", "categorical")
+
+
+# --------------------------------------------------------------------------- #
+# few-shot examples
+# --------------------------------------------------------------------------- #
+class TestFewShot:
+    """Worked examples exist to fix answer-format compliance, so the thing that
+    matters is that they demonstrate a format our own extractor accepts."""
+
+    def _record(self, answer_type=AnswerType.NUMERIC, options=None):
+        return QARecord(
+            id="q1", source="finqa", domain=Domain.REPORT_QA,
+            question="What was the change?", context="Revenue 100 then 150.",
+            gold_answer="50", answer_type=answer_type,
+            answer_options=options or [],
+        )
+
+    def test_off_by_default(self):
+        assert len(build_messages(self._record())) == 2
+
+    def test_examples_are_prepended_as_prior_turns(self):
+        messages = build_messages(self._record(), few_shot=True)
+        assert [m["role"] for m in messages] == [
+            "system", "user", "assistant", "user", "assistant", "user"]
+
+    def test_the_real_question_is_last(self):
+        messages = build_messages(self._record(), few_shot=True)
+        assert "Revenue 100 then 150." in messages[-1]["content"]
+
+    def test_every_example_answer_survives_our_own_extractor(self):
+        for _, answer in FEW_SHOT:
+            assert extract_answer(answer), f"example does not parse: {answer!r}"
+
+    def test_examples_cover_both_answer_types(self):
+        extracted = [extract_answer(a) for _, a in FEW_SHOT]
+        assert any(e.replace(".", "").isdigit() for e in extracted), "no numeric example"
+        assert any(e.isalpha() for e in extracted), "no categorical example"
+
+    def test_examples_end_with_the_answer_marker(self):
+        for _, answer in FEW_SHOT:
+            assert ANSWER_MARKER in answer
+
+    def test_examples_are_short_enough_to_prepend_to_every_question(self):
+        total = sum(len(q) + len(a) for q, a in FEW_SHOT)
+        assert total < 900, f"few-shot block is {total} characters, too costly per call"

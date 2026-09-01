@@ -83,7 +83,7 @@ def run_pilot(records: list[QARecord], cfg: Config, llm: ReasoningLLM | None = N
     llm = llm or ReasoningLLM(cfg)
     tokenizer = llm.tokenizer
 
-    prompts = [llm.render(build_messages(r)) for r in records]
+    prompts = [llm.render(build_messages(r, cfg.prompting.few_shot)) for r in records]
     log.info("pilot: %d questions on %s", len(records), llm.model_id)
 
     start = time.perf_counter()

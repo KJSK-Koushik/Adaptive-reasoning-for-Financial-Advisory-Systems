@@ -22,6 +22,11 @@ from .schema import AnswerType, QARecord
 
 ANSWER_MARKER = "Final answer:"
 
+#: Separators used when composing prompts, named so the few-shot examples below
+#: read cleanly instead of being peppered with escape sequences.
+LINE = chr(10)
+BREAK = chr(10) * 2
+
 #: Appended to a partial reasoning trace to force an early answer. Kept in sync with
 #: ``traces.probe_prompt`` in the config.
 PROBE_PROMPT = f"\n\n{ANSWER_MARKER}"
@@ -36,6 +41,30 @@ SYSTEM_PROMPT = (
 
 _NUMERIC_HINT = "Answer with a single number."
 _CATEGORICAL_HINT = "Answer with exactly one of: {options}."
+
+#: Two short worked examples, shown before the real question when
+#: ``prompting.few_shot`` is on. They are invented rather than drawn from any split,
+#: so no gold answer can leak into a question the model is later evaluated on.
+#:
+#: Their job is format compliance, not teaching finance. Measured on the 768-token
+#: traces, 23% of wrong numeric answers were a sentence or an unfinished calculation
+#: rather than a value - the model reasoning correctly and then failing to land on the
+#: contract. One numeric and one categorical example cover both answer types.
+FEW_SHOT: list[tuple[str, str]] = [
+    (
+        "Revenue was 240 in 2019 and 300 in 2020. What was the percentage increase?"
+        + BREAK + "Answer with a single number.",
+        "The increase is 300 - 240 = 60. As a percentage of 2019 revenue, "
+        "60 / 240 = 0.25, which is 25 percent." + LINE + ANSWER_MARKER + " 25",
+    ),
+    (
+        "The applicant has no savings account, six years of employment and no prior "
+        "defaults. Classify the credit risk."
+        + BREAK + "Answer with exactly one of: good, bad.",
+        "Stable employment and a clean repayment history outweigh the absent "
+        "savings account, so the profile is acceptable." + LINE + ANSWER_MARKER + " good",
+    ),
+]
 
 
 def build_user_prompt(record: QARecord) -> str:
@@ -53,12 +82,20 @@ def build_user_prompt(record: QARecord) -> str:
     return "\n\n".join(parts)
 
 
-def build_messages(record: QARecord) -> list[dict[str, str]]:
-    """Chat-format messages for an instruction-tuned model."""
-    return [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": build_user_prompt(record)},
-    ]
+def build_messages(record: QARecord, few_shot: bool = False) -> list[dict[str, str]]:
+    """Chat-format messages for an instruction-tuned model.
+
+    With ``few_shot``, two invented worked examples are prepended as prior turns. The
+    system prompt already states the answer contract; the examples demonstrate it,
+    which a zero-shot instruction alone was not reliably achieving.
+    """
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    if few_shot:
+        for question, answer in FEW_SHOT:
+            messages.append({"role": "user", "content": question})
+            messages.append({"role": "assistant", "content": answer})
+    messages.append({"role": "user", "content": build_user_prompt(record)})
+    return messages
 
 
 # Reasoning models wrap their chain of thought in <think> tags; anything inside is
