@@ -9,6 +9,7 @@ hours.
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 from .. import paths
@@ -119,7 +120,18 @@ def run(records: list[QARecord], cfg: Config, llm: ReasoningLLM | None = None,
     pending: list[Trace] = []
     produced = 0
 
+    budget = cfg.traces.max_wall_seconds
+    started = time.monotonic()
+    stopped_early = False
+
     for start in range(0, len(todo), batch_size):
+        if budget is not None and time.monotonic() - started >= budget:
+            log.warning(
+                "wall-clock budget of %ds reached after %d traces - stopping and "
+                "consolidating what exists", budget, produced)
+            stopped_early = True
+            break
+
         chunk = todo[start : start + batch_size]
         traces = generator.generate(chunk, probe=True)
         pending.extend(traces)
@@ -137,7 +149,10 @@ def run(records: list[QARecord], cfg: Config, llm: ReasoningLLM | None = None,
         _flush(pending, shard_index)
 
     consolidate()
-    return summarise()
+    summary = summarise()
+    summary["stopped_early"] = stopped_early
+    summary["wall_seconds"] = round(time.monotonic() - started, 1)
+    return summary
 
 
 def summarise() -> dict:

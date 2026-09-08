@@ -143,6 +143,12 @@ class PromptingCfg(_Base):
 
 
 class TracesCfg(_Base):
+    # Stop generating after this many seconds, flush what exists and consolidate.
+    # A hosted notebook that is force-killed at its time limit saves nothing: one
+    # 12-hour run produced no recoverable traces at all because the process never
+    # reached its own consolidation step. Finishing early with fewer traces beats
+    # being killed with none. None means no limit.
+    max_wall_seconds: int | None = None
     n_questions: int
     step_tokens: int
     step_delimiters: list[str]

@@ -64,3 +64,54 @@ def test_summary_counts_steps():
 )
 def test_earliest_correct_step_matches_the_pattern(pattern, expected):
     assert _trace(pattern=pattern).earliest_correct_step == expected
+
+
+# --------------------------------------------------------------------------- #
+# wall-clock budget
+# --------------------------------------------------------------------------- #
+class TestWallClockBudget:
+    """A hosted notebook killed at its time limit saves nothing. Stopping
+    ourselves, flushing and consolidating turns a lost run into a smaller one."""
+
+    def test_budget_defaults_to_unlimited(self):
+        from adaptive_reasoning.config import load_config
+
+        assert load_config().traces.max_wall_seconds is None
+
+    def test_budget_is_configurable(self, tmp_path):
+        from adaptive_reasoning.config import load_config
+
+        cfg = load_config(overrides={"traces": {"max_wall_seconds": 42}})
+        assert cfg.traces.max_wall_seconds == 42
+
+    def test_run_stops_when_the_budget_is_exhausted(self, monkeypatch, tmp_path):
+        """With a zero budget nothing is generated, and the run still returns."""
+        import adaptive_reasoning.traces.runner as runner
+        from adaptive_reasoning.config import load_config
+        from adaptive_reasoning.schema import AnswerType, Domain, QARecord
+
+        monkeypatch.setattr(runner, "SHARD_DIR", tmp_path / "_shards")
+        monkeypatch.setattr(runner, "completed_ids", lambda: set())
+        monkeypatch.setattr(runner, "consolidate", lambda: (tmp_path / "a", tmp_path / "b"))
+        monkeypatch.setattr(runner, "summarise", lambda: {"n_traces": 0})
+
+        class _Generator:
+            def __init__(self, *a, **k):
+                pass
+
+            def generate(self, records, probe=True):
+                raise AssertionError("generation should not start on a zero budget")
+
+        monkeypatch.setattr(runner, "TraceGenerator", _Generator)
+        monkeypatch.setattr(runner, "ReasoningLLM", lambda cfg: object())
+
+        cfg = load_config(overrides={"traces": {"max_wall_seconds": 0}})
+        records = [
+            QARecord(id=f"q{i}", source="synthetic", domain=Domain.INVESTMENT,
+                     question="q", context="", gold_answer="1",
+                     answer_type=AnswerType.NUMERIC)
+            for i in range(4)
+        ]
+        out = runner.run(records, cfg, resume=False)
+        assert out["stopped_early"] is True
+        assert "wall_seconds" in out
