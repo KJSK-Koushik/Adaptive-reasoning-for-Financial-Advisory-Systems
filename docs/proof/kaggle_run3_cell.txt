@@ -1,0 +1,147 @@
+# ── PHASE 3, RUN 3 ───────────────────────────────────────────────────────
+# Paste as the ONLY cell in a fresh Kaggle notebook.
+# Save Version -> Save & Run All (Commit). Do not run interactively.
+#
+# What changed, and why
+#
+#   2,500 questions   Run 2 asked for 4,000 and was killed at the 12-hour limit
+#                     with nothing saved. At the measured 7.3 s/question that
+#                     was always going to be 8-12 hours. 2,500 is ~5 hours.
+#
+#   9-hour budget     traces.max_wall_seconds stops generation between batches,
+#                     flushes and consolidates. A run that overruns now ends
+#                     with fewer traces instead of none - which is what cost a
+#                     full 12-hour session.
+#
+#   1536 tokens       25% of current traces stop mid-calculation. Worst hit is
+#   + few-shot        the synthetic finance-maths set: 68% truncated, but 80%
+#                     correct when allowed to finish. The pilot measured
+#                     truncation falling to 2% and the answer rate rising from
+#                     92% to 100% with these two changes.
+#
+# Expected: overall accuracy 44.3% -> 48-52%.
+
+import glob, json, os, shutil, subprocess, sys
+from pathlib import Path
+
+REPO = 'https://github.com/KJSK-Koushik/Adaptive-reasoning-for-Financial-Advisory-Systems.git'
+WORK, INPUT = Path('/kaggle/working'), Path('/kaggle/input')
+PROJECT, FRESH = WORK / 'project', WORK / '_repo'
+
+os.chdir(WORK)
+
+# ── 1. data ──────────────────────────────────────────────────────────────
+found = glob.glob(str(INPUT / '**' / 'data' / 'processed' / 'unified.parquet'),
+                  recursive=True)
+if not found:
+    raise SystemExit('unified.parquet not found. Sidebar -> Add Input -> your '
+                     'Datasets -> adaptive-reasoning-fas, then re-run.')
+data_root = Path(found[0]).parent.parent.parent
+print('data from:', data_root)
+
+if PROJECT.exists():
+    shutil.rmtree(PROJECT)
+PROJECT.mkdir(parents=True)
+shutil.copytree(data_root / 'data', PROJECT / 'data')
+
+# ── 2. code ──────────────────────────────────────────────────────────────
+if FRESH.exists():
+    shutil.rmtree(FRESH)
+print('cloning the current code ...')
+subprocess.check_call(['git', 'clone', '--depth', '1', '--quiet', REPO, str(FRESH)],
+                      cwd=str(WORK))
+for part in ('src', 'scripts', 'configs'):
+    shutil.copytree(FRESH / part, PROJECT / part)
+for f in ('requirements.txt', 'requirements-gpu.txt', 'pyproject.toml'):
+    if (FRESH / f).exists():
+        shutil.copy2(FRESH / f, PROJECT / f)
+
+commit = subprocess.run(['git', '-C', str(FRESH), 'log', '-1', '--format=%h %s'],
+                        capture_output=True, text=True, cwd=str(WORK)).stdout.strip()
+print('code at commit:', commit)
+os.chdir(PROJECT)
+
+# Every feature this run depends on must be in the clone, or five hours produce
+# the traces we already have.
+cfg_src = Path('src/adaptive_reasoning/config.py').read_text(encoding='utf-8')
+prompt_src = Path('src/adaptive_reasoning/prompting.py').read_text(encoding='utf-8')
+for needle, where in (('few_shot', cfg_src), ('max_wall_seconds', cfg_src),
+                      ('FEW_SHOT', prompt_src)):
+    assert needle in where, f'cloned code is missing {needle} - clone is stale'
+print('few-shot: yes | wall-clock budget: yes')
+
+# ── 3. dependencies ──────────────────────────────────────────────────────
+try:
+    import torch, transformers  # noqa: F401
+    print('dependencies already present')
+except ImportError:
+    subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-q',
+                           '-r', 'requirements.txt'])
+
+# ── 4. configuration ─────────────────────────────────────────────────────
+Path('configs/experiment').mkdir(parents=True, exist_ok=True)
+Path('configs/experiment/run3.yaml').write_text("""llm:
+  model_id: deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B
+  batch_size: 32
+  max_new_tokens: 1536
+
+prompting:
+  few_shot: true
+
+traces:
+  n_questions: 2500
+  step_tokens: 48
+  max_steps: 32
+  probe_max_tokens: 24
+  checkpoint_every: 100
+  max_wall_seconds: 32400
+""")
+print(Path('configs/experiment/run3.yaml').read_text())
+
+# ── 5. gate, then the run ────────────────────────────────────────────────
+rc = subprocess.call([sys.executable, 'scripts/run_pilot.py', '--experiment', 'run3'])
+if rc != 0:
+    raise SystemExit(f'Pilot gate failed (exit {rc}). Do not start the long run.')
+
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
+rc = subprocess.call([sys.executable, 'scripts/run_phase3.py', '--experiment', 'run3'])
+print('\nexit code:', rc)
+
+# ── 6. copy results to the notebook root ─────────────────────────────────
+# Belt and braces: the previous run's /kaggle/working/project never appeared in
+# the saved output. Putting the files at the top level makes them easy to find
+# and hard to lose.
+out_dir = WORK / 'phase3_results'
+out_dir.mkdir(exist_ok=True)
+for rel in ('artifacts/traces/traces.parquet',
+            'artifacts/traces/trace_summary.parquet',
+            'artifacts/results/phase3_summary.json',
+            'artifacts/results/phase3_pilot.json'):
+    src = PROJECT / rel
+    if src.exists():
+        dest = out_dir / Path(rel).name
+        shutil.copy2(src, dest)
+        print(f'  saved {dest.name}  ({dest.stat().st_size/1e6:.1f} MB)')
+
+shards = PROJECT / 'artifacts/traces/_shards'
+if shards.exists():
+    shutil.make_archive(str(WORK / 'shards'), 'zip', shards)
+    print(f'  saved shards.zip  ({(WORK / "shards.zip").stat().st_size/1e6:.1f} MB)')
+
+# ── 7. the numbers ───────────────────────────────────────────────────────
+summary = PROJECT / 'artifacts/results/phase3_summary.json'
+if not summary.exists():
+    raise SystemExit(f'No summary written (exit {rc}). Read the error above.')
+
+s = json.loads(summary.read_text())
+print('\n' + '=' * 62)
+print('  RUN 3 vs THE TRACES WE HAVE')
+print('=' * 62)
+print(f"  traces               {s['n_traces']:6,}      (was 4,000)")
+print(f"  final accuracy       {s['final_accuracy']*100:6.1f}%     (was 44.3%)")
+print(f"  correct at any point {s['solvable_fraction']*100:6.1f}%     (was 65.5%)")
+print(f"  mean tokens          {s['mean_total_tokens']:6.0f}      (was 533)")
+print(f"  mean steps           {s['mean_steps']:6.1f}      (was 11.5)")
+print('=' * 62)
+print('\n  48% or above means the truncation fix worked.')
+print('  Download the phase3_results folder from the Output tab.')
