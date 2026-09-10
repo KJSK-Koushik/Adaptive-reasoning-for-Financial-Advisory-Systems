@@ -123,6 +123,7 @@ def run(records: list[QARecord], cfg: Config, llm: ReasoningLLM | None = None,
     budget = cfg.traces.max_wall_seconds
     started = time.monotonic()
     stopped_early = False
+    checked = False
 
     for start in range(0, len(todo), batch_size):
         if budget is not None and time.monotonic() - started >= budget:
@@ -136,6 +137,25 @@ def run(records: list[QARecord], cfg: Config, llm: ReasoningLLM | None = None,
         traces = generator.generate(chunk, probe=True)
         pending.extend(traces)
         produced += len(traces)
+
+        # Check the probe early, on the first sample, rather than discovering after
+        # hours that every reward was computed from a fiction. The last probe and the
+        # model's own final answer measure the same thing at the same point, so they
+        # should agree; few-shot examples once drove this to 65% by making the probe
+        # echo an example, and the run completed with unusable traces.
+        if not checked and produced >= min(EARLY_CHECK_TRACES, len(todo)):
+            checked = True
+            agree = _agreement_of(pending)
+            log.info("probe agreement on the first %d traces: %.1f%%",
+                     len(pending), agree * 100)
+            if agree < MIN_PROBE_AGREEMENT:
+                raise RuntimeError(
+                    f"probe agreement is {agree:.1%} on the first {len(pending)} "
+                    f"traces, below the {MIN_PROBE_AGREEMENT:.0%} floor. The forced "
+                    f"answer disagrees with the model's own conclusion, so every "
+                    f"reward would be computed from it wrongly. Check the prompt - "
+                    f"few-shot examples make the probe echo the example."
+                )
 
         if len(pending) >= cfg.traces.checkpoint_every:
             _flush(pending, shard_index)
@@ -155,6 +175,61 @@ def run(records: list[QARecord], cfg: Config, llm: ReasoningLLM | None = None,
     return summary
 
 
+#: Traces to generate before checking that the probe means what we think it means.
+EARLY_CHECK_TRACES = 60
+
+#: Below this, the run aborts rather than producing hours of unusable data.
+MIN_PROBE_AGREEMENT = 0.90
+
+
+def _agreement_of(traces: list[Trace]) -> float:
+    """Share of traces whose last probe agrees with the model's own final answer."""
+    if not traces:
+        return 1.0
+    hits = sum(
+        1 for t in traces
+        if t.steps and bool(t.steps[-1].probe_correct) == bool(t.final_correct)
+    )
+    return hits / len(traces)
+
+
+def _probe_agreement() -> float:
+    """Share of traces whose last probe agrees with the model's own final answer.
+
+    These measure the same thing - what the model would say if it stopped now, at the
+    point where it has in fact stopped - so they should almost always agree. A low
+    figure means the probe is capturing something other than the model's conclusion,
+    and every reward in the RL dataset is then computed from a fiction.
+
+    This is not hypothetical: adding two few-shot examples to the prompt caused the
+    probe to echo an example's answer at 68% of terminal steps, which read as full
+    reasoning scoring 18.7% when the model's own answers scored 43.9%. Eleven GPU
+    hours produced unusable traces, and nothing in the pipeline noticed.
+    """
+    import pandas as pd
+
+    if not (paths.TRACE_DATASET.exists() and TRACE_SUMMARY.exists()):
+        return 1.0
+
+    steps = pd.read_parquet(paths.TRACE_DATASET,
+                            columns=["question_id", "step_index", "probe_correct"])
+    summary = pd.read_parquet(TRACE_SUMMARY, columns=["question_id", "final_correct"])
+    last = steps.sort_values("step_index").groupby("question_id").tail(1)
+    merged = last.merge(summary, on="question_id", how="inner")
+    if merged.empty:
+        return 1.0
+
+    agreement = float((merged.probe_correct.astype(bool)
+                       == merged.final_correct.astype(bool)).mean())
+    if agreement < 0.9:
+        log.warning(
+            "probe agreement is only %.1f%% - the final probe disagrees with the "
+            "model's own answer on %d of %d traces. Check the prompt: few-shot "
+            "examples make the probe echo the example instead of concluding.",
+            agreement * 100, int((1 - agreement) * len(merged)), len(merged))
+    return round(agreement, 4)
+
+
 def summarise() -> dict:
     """Headline statistics over the consolidated traces."""
     import pandas as pd
@@ -172,6 +247,8 @@ def summarise() -> dict:
         "mean_steps": round(float(frame.n_steps.mean()), 2),
         "solvable_fraction": round(float(len(solved) / max(len(frame), 1)), 4),
     }
+
+    summary["probe_agreement"] = _probe_agreement()
 
     if not solved.empty:
         summary["oracle_mean_tokens"] = round(float(solved.oracle_tokens.mean()), 1)

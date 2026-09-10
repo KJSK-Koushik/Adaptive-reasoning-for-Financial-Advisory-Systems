@@ -115,3 +115,50 @@ class TestWallClockBudget:
         out = runner.run(records, cfg, resume=False)
         assert out["stopped_early"] is True
         assert "wall_seconds" in out
+
+
+# --------------------------------------------------------------------------- #
+# probe agreement
+# --------------------------------------------------------------------------- #
+class TestProbeAgreement:
+    """The forced probe and the model's own final answer measure the same thing at
+    the same point. When they diverge the probe is capturing something else, and
+    every reward in the RL dataset is computed from it wrongly."""
+
+    def _trace(self, probe_correct, final_correct):
+        from adaptive_reasoning.schema import Trace, TraceStep
+
+        step = TraceStep(
+            question_id="q", step_index=0, tokens_so_far=48, step_text="",
+            probe_answer="x", probe_correct=probe_correct, confidence=0.5,
+            min_token_confidence=0.5, entropy=0.5, answer_changed=False,
+            is_terminal=True,
+        )
+        return Trace(question_id="q", total_tokens=48, steps=[step],
+                     final_answer="x", final_correct=final_correct)
+
+    def test_full_agreement(self):
+        from adaptive_reasoning.traces.runner import _agreement_of
+
+        traces = [self._trace(True, True), self._trace(False, False)]
+        assert _agreement_of(traces) == 1.0
+
+    def test_total_disagreement(self):
+        from adaptive_reasoning.traces.runner import _agreement_of
+
+        traces = [self._trace(False, True), self._trace(True, False)]
+        assert _agreement_of(traces) == 0.0
+
+    def test_the_contaminated_case_falls_below_the_floor(self):
+        """Run 3 measured 64.8%; the floor is 90%."""
+        from adaptive_reasoning.traces.runner import MIN_PROBE_AGREEMENT, _agreement_of
+
+        traces = [self._trace(False, True)] * 35 + [self._trace(True, True)] * 65
+        agreement = _agreement_of(traces)
+        assert agreement == pytest.approx(0.65)
+        assert agreement < MIN_PROBE_AGREEMENT
+
+    def test_empty_input_is_treated_as_agreeing(self):
+        from adaptive_reasoning.traces.runner import _agreement_of
+
+        assert _agreement_of([]) == 1.0
