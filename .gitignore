@@ -52,3 +52,5 @@ phase3_results.zip
 # Course/report deliverables (kept locally, not tracked)
 *.pptx
 *.docx
+
+.coverage
