@@ -106,6 +106,11 @@ def run(records: list[QARecord], cfg: Config, llm: ReasoningLLM | None = None,
     """Generate traces for every record. Returns a summary dictionary."""
     llm = llm or ReasoningLLM(cfg)
     generator = TraceGenerator(llm, cfg)
+    # Force the load here so the log separates "loading" from "generating". One run
+    # stalled for seven hours after the weight-loading bar with no way to tell which.
+    if hasattr(type(llm), "model"):
+        _ = llm.model
+    log.info("model ready; generating in batches of %d", cfg.llm.batch_size)
 
     done = completed_ids() if resume else set()
     todo = [r for r in records if r.id not in done]
@@ -134,9 +139,13 @@ def run(records: list[QARecord], cfg: Config, llm: ReasoningLLM | None = None,
             break
 
         chunk = todo[start : start + batch_size]
+        batch_started = time.monotonic()
         traces = generator.generate(chunk, probe=True)
         pending.extend(traces)
         produced += len(traces)
+        log.info("batch done: %d/%d traced, %.0fs for this batch, %.0fs elapsed",
+                 produced, len(todo), time.monotonic() - batch_started,
+                 time.monotonic() - started)
 
         # Check the probe early, on the first sample, rather than discovering after
         # hours that every reward was computed from a fiction. The last probe and the
@@ -161,9 +170,6 @@ def run(records: list[QARecord], cfg: Config, llm: ReasoningLLM | None = None,
             _flush(pending, shard_index)
             shard_index += 1
             pending = []
-
-        if produced % max(batch_size * 5, 1) == 0:
-            log.info("  %d/%d traced", produced, len(todo))
 
     if pending:
         _flush(pending, shard_index)

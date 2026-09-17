@@ -73,7 +73,16 @@ def main() -> int:
         records = stratified_sample(records, n, cfg.project.seed, by="source")
 
     print(f"tracing {len(records)} questions with {cfg.llm.model_id}")
-    summary = runner.run(records, cfg, resume=not args.no_resume)
+
+    # If the process stops making progress, write every thread's stack to stderr
+    # every fifteen minutes. A run once sat for seven hours after loading the model
+    # with nothing in the log to say where; this makes the next one self-describing.
+    import faulthandler
+    faulthandler.dump_traceback_later(900, repeat=True, file=sys.stderr)
+    try:
+        summary = runner.run(records, cfg, resume=not args.no_resume)
+    finally:
+        faulthandler.cancel_dump_traceback_later()
 
     print()
     print("=" * 68)

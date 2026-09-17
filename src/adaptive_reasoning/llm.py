@@ -102,8 +102,10 @@ class ReasoningLLM:
             dispatched = "device_map" in kwargs or "quantization_config" in kwargs
             if not dispatched:
                 model = model.to(self.hw.device)
+            # Inference is wrapped in no_grad at every call site. Turning gradients
+            # off process-wide here broke DQN training in any process that had
+            # loaded a model first, which the test suite does.
             model.eval()
-            torch.set_grad_enabled(False)
             self._model = model
         return self._model
 
