@@ -14,6 +14,7 @@ Slide numbers refer to Mid_Review_Adaptive_Reasoning_v2.pptx (20 slides).
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import sys
 from pathlib import Path
@@ -107,10 +108,8 @@ def gather() -> dict:
         curve[k] = 100 * float(np.mean([bool(held.get((q, int(i)), False)) for q, i in idx.items()]))
 
     ablations = {}
-    try:
+    with contextlib.suppress(FileNotFoundError):
         ablations = _load("phase9_summary.json")
-    except FileNotFoundError:
-        pass
 
     return {
         "p3": p3, "p4": p4, "full": full, "dqn": dqn, "fixed": fixed, "bc": bc,
@@ -142,7 +141,10 @@ def refresh(n_tests: int, code_lines: int, code_files: int) -> Path:
 
     prs = Presentation(str(SOURCE))
     S = prs.slides
-    sh = lambda i: list(S[i - 1].shapes)          # 1-based slide, 0-based shape
+
+    def sh(i: int) -> list:                        # 1-based slide, 0-based shapes
+        return list(S[i - 1].shapes)
+
 
     # -- 1 title ------------------------------------------------------------- #
     set_shape(sh(1)[4], f"Teaching a language model when to stop thinking — {margin:+.1f} "
@@ -159,13 +161,17 @@ def refresh(n_tests: int, code_lines: int, code_files: int) -> Path:
                     "controller behind a FastAPI service and a dashboard. This review reports "
                     "measured numbers, including an ablation that contradicts part of our "
                     "original hypothesis.")
-    set_shape(s[5], "Phases 0–7"); set_shape(s[6], "COMPLETE")
+    set_shape(s[5], "Phases 0–7")
+    set_shape(s[6], "COMPLETE")
     set_shape(s[7], "Data → traces → RL → evaluation → live controller")
-    set_shape(s[9], "Phase 8"); set_shape(s[10], "IN PROGRESS")
+    set_shape(s[9], "Phase 8")
+    set_shape(s[10], "IN PROGRESS")
     set_shape(s[11], "Advisory application — API and dashboard")
-    set_shape(s[13], "Phase 9"); set_shape(s[14], "IN PROGRESS")
+    set_shape(s[13], "Phase 9")
+    set_shape(s[14], "IN PROGRESS")
     set_shape(s[15], "Ablations and final report")
-    set_shape(s[18], f"{code_lines:,}"); set_shape(s[19], f"lines of Python across {code_files} files")
+    set_shape(s[18], f"{code_lines:,}")
+    set_shape(s[19], f"lines of Python across {code_files} files")
     set_shape(s[20], f"{n_tests}")
     set_shape(s[24], f"{p4['n_transitions']:,}")
     set_shape(s[25], f"RL transitions generated from {p3['n_traces']:,} traces")
@@ -235,11 +241,14 @@ def refresh(n_tests: int, code_lines: int, code_files: int) -> Path:
     s = sh(12)
     set_shape(s[4], pct(p3["final_accuracy"]))
     set_shape(s[6], pct(p3["solvable_fraction"]))
-    set_shape(s[8], f"{F['gap']:.0f} pts"); set_shape(s[9], "answers found, then lost")
+    set_shape(s[8], f"{F['gap']:.0f} pts")
+    set_shape(s[9], "answers found, then lost")
     set_shape(s[10], f"{p3['mean_steps']:.1f}")
     t = s[14].table
-    set_cell(t.cell(1, 1), pct(full["accuracy"])); set_cell(t.cell(1, 2), f"{full['mean_tokens']:.0f}")
-    set_cell(t.cell(2, 1), pct(oracle["accuracy"])); set_cell(t.cell(2, 2), f"{oracle['mean_tokens']:.0f}")
+    set_cell(t.cell(1, 1), pct(full["accuracy"]))
+    set_cell(t.cell(1, 2), f"{full['mean_tokens']:.0f}")
+    set_cell(t.cell(2, 1), pct(oracle["accuracy"]))
+    set_cell(t.cell(2, 2), f"{oracle['mean_tokens']:.0f}")
     set_cell(t.cell(2, 3), f"{oracle['token_reduction_pct']:.1f}%")
     set_shape(s[15], "This is not a trade-off. Stopping well saves three-quarters of the "
                      f"computation and gains {F['headroom']:.0f} accuracy points. Overthinking "
@@ -360,26 +369,30 @@ def refresh(n_tests: int, code_lines: int, code_files: int) -> Path:
     # -- 16 pending works ---------------------------------------------------- #
     s = sh(16)
     set_shape(s[3], "Two phases remain, plus an optional GPU rerun and the write-up.")
-    set_shape(s[5], "Phase 8"); set_shape(s[7], "PRIORITY")
+    set_shape(s[5], "Phase 8")
+    set_shape(s[7], "PRIORITY")
     set_shape(s[8], "Advisory application")
     set_shape(s[9], "The FastAPI service and the dashboard work end to end on replayed "
                     "traces. Remaining: finish the interface, fix the demo question set, "
                     "record the walkthrough.")
     set_shape(s[10], "~3 days")
-    set_shape(s[12], "Phase 9"); set_shape(s[14], "PRIORITY")
+    set_shape(s[12], "Phase 9")
+    set_shape(s[14], "PRIORITY")
     set_shape(s[15], "Ablations and final report")
     set_shape(s[16], "Six variants isolate what each ingredient contributes — difficulty in "
                      "the state, in the reward, the answer-shape features, and perfect "
                      "difficulty as an upper bound. The report and deck are generated from "
                      "the results files so no figure is copied by hand.")
     set_shape(s[17], "~1 week")
-    set_shape(s[19], "Phase 3b"); set_shape(s[21], "OPTIONAL")
+    set_shape(s[19], "Phase 3b")
+    set_shape(s[21], "OPTIONAL")
     set_shape(s[22], "Extended reasoning budget")
     set_shape(s[23], "One in four traces hits the 768-token cap mid-reasoning. A 1,536-token "
                      "rerun over 2,500 questions is prepared, with a watchdog and a "
                      "probe-agreement guard; it waits on GPU quota.")
     set_shape(s[24], "~5 GPU-hours")
-    set_shape(s[26], "Write-up"); set_shape(s[28], "SCHEDULED")
+    set_shape(s[26], "Write-up")
+    set_shape(s[28], "SCHEDULED")
     set_shape(s[29], "Final report and viva")
     set_shape(s[30], "Consolidate the findings, verify the reference list, and settle the "
                      "final title in light of the ablation.")

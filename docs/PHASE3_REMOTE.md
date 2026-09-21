@@ -96,15 +96,20 @@ Verified failing behaviour, run locally against the 0.5B model:
 0. **Run `scripts/run_pilot.py` and confirm the gate passes.**
 1. Phase 1 and 2 (data prep, no GPU) run locally and produce `unified.parquet`.
 2. Upload `unified.parquet` to Kaggle as a private Dataset (~30 MB).
-3. Run `notebooks/phase3_kaggle.ipynb` — it pip-installs `requirements-gpu.txt`, clones the
-   repo, and calls the same `src/adaptive_reasoning/traces/` code that runs locally.
-   **No forked logic**: the notebook is a thin wrapper so results stay reproducible.
-4. Download `traces.parquet` (~200–400 MB) back into `artifacts/traces/`.
-5. Phases 4–9 run locally on CPU. DQN training on 14 features is a matter of minutes.
+3. Paste `docs/proof/kaggle_run5_cell.txt` as the only cell of a fresh notebook, attach the
+   dataset, set the accelerator to GPU T4 x2, and Save & Run All. The cell clones the repo
+   and calls the same `src/adaptive_reasoning/traces/` code that runs locally - **no forked
+   logic** - and runs under a watchdog that kills a stalled run after 25 silent minutes and
+   retries once at a smaller batch. Earlier cells (`kaggle_run3_cell.txt`,
+   `kaggle_run4_cell.txt`) are kept for the record.
+4. Download the `phase3_results` folder (or `shards.zip` from an interrupted run, then
+   `python scripts/consolidate_shards.py --shards <dir>`) into `artifacts/traces/`.
+5. Check `probe_agreement` in `phase3_summary.json` is at least 0.90 before using the traces.
+6. Phases 4-9 run locally on CPU. DQN training on 18 features is a matter of minutes.
 
 ## Local fallback
 
-`scripts/run_phase3.py --smoke --n 20` runs the full pipeline on CPU with a tiny model, so
+`scripts/run_phase3.py --experiment smoke --limit 4` runs the full pipeline on CPU with a tiny model, so
 the code can be developed and debugged locally before burning remote GPU time. This is how
 Phase 3 gets built: correctness locally, scale remotely.
 

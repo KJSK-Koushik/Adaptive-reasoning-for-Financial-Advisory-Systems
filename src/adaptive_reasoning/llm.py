@@ -63,7 +63,6 @@ class ReasoningLLM:
     @property
     def model(self):
         if self._model is None:
-            import torch
             from transformers import AutoModelForCausalLM
 
             dtype = torch_dtype(self.cfg.llm.dtype, self.hw.backend)

@@ -34,15 +34,18 @@ curve. Figures quoted here are all at the 65% point unless stated otherwise.
 On roughly **one question in five, the model reaches the right answer and then talks
 itself out of it.** This is the premise of the project, measured rather than assumed.
 
-Supporting evidence — the probability that the current answer is correct, by step:
+Supporting evidence — the probability that the current answer is correct, by step, among traces still reasoning at that step:
 
 | Step | 0 | 1 | 3 | 6 | 10 | 15 |
 |---|---|---|---|---|---|---|
 | Correct | 22.6% | 22.8% | 28.3% | 34.7% | 33.7% | 32.9% |
 
-**Accuracy plateaus at about step 6 and never improves again.** The model reasons for a
-mean of 11.5 steps, so roughly half of all reasoning is spent after the point where it
-stops helping.
+**Among the traces still running, accuracy plateaus at about step 6.** The model reasons
+for a mean of 11.5 steps, so roughly half of all reasoning is spent after the point
+where it stops helping. (Measured the other way - accuracy if *every* trace were
+stopped at step k - the curve rises to the final 44.3%, because the questions that
+finish early are the easy ones; the two views agree that the answer, when it comes,
+comes early.)
 
 ### A known under-count in the grading
 
@@ -89,7 +92,7 @@ accuracy, and good stopping recovers it.
 Every result above compares the whole system against baselines, which cannot separate
 "difficulty-awareness helps" from "any learned policy helps". Phase 9 removes each
 ingredient and retrains from scratch. All five variants are measured against the same
-fixed-step baseline (32.1%) at nearly the same operating point, so the margin column is
+fixed-step baseline (32.0%) at nearly the same operating point, so the margin column is
 directly comparable.
 
 | Variant | Accuracy | Tokens saved | Margin over fixed step | vs the full system |
@@ -163,8 +166,8 @@ At matched cost (~48% of tokens saved):
 
 | Policy | Accuracy |
 |---|---|
-| Stop at a fixed step | 32.1% |
-| Stop at a fixed token budget | 32.1% |
+| Stop at a fixed step | 32.0% |
+| Stop at a fixed token budget | 32.0% |
 | Confidence threshold | 30.2% |
 | Entropy threshold | 26.5% |
 | **Difficulty-aware DQN** | **40.1%** |
@@ -288,10 +291,11 @@ with `python scripts/run_phase5.py --experiment reported --sweep` to refresh.
 | 1.0 | 32.6% | 57.9% |
 | 2.0 | 29.5% | 70.7% |
 
-## 5. Difficulty-awareness works - in the opposite direction to the hypothesis
+## 5. How the budget is allocated across difficulty tiers
 
 The original hypothesis was *easy questions → stop early; hard questions → be patient*.
-The learned policy does the reverse:
+The learned policy does the reverse - and section 7 shows the allocation is not where
+its accuracy comes from:
 
 | Tier | Unaided reasoning | Stopped at | Share used | Accuracy |
 |---|---|---|---|---|
@@ -317,8 +321,8 @@ Note that absolute token counts are misleading: hard questions get *longer* trac
 begin with, so the policy is in fact cutting them hardest (73% saved on hard vs 46% on
 easy).
 
-And it is right to. On hard questions the model is correct only 9% of the time however
-long it thinks, because 63% of them are never correct at any point. Extra thinking pays
+And it is right to. On hard questions the model is correct only 15% of the time however
+long it thinks, because 62% of them are never correct at any point. Extra thinking pays
 off only when the answer is *reachable*.
 
 **The useful signal is not "is this question hard?" but "is this answer reachable?"**
@@ -329,7 +333,9 @@ off only when the answer is *reachable*.
 
 * The premise is validated: overthinking is real and costly.
 * Learned stopping substantially beats the fixed-threshold methods used in prior work.
-* Among learned policies, supervised imitation currently edges out reinforcement
-  learning at matched cost; the RL formulation's advantage is tunability, not accuracy.
-* The difficulty-aware mechanism works, but the mechanism it discovered is about
-  answer reachability rather than question difficulty.
+* Among learned policies, reinforcement learning matches supervised imitation at
+  matched cost (+1.3 points, not significant); the RL formulation's advantage is
+  tunability, not accuracy.
+* The difficulty-aware formulation does not contribute: removing difficulty from the
+  state improves accuracy by 4 points, and even the true label buys nothing (section
+  7). The gain comes from reading the model's own confidence and answer stability.

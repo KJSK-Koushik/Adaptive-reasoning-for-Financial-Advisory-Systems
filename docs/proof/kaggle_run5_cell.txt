@@ -27,7 +27,13 @@
 #
 # Expected: overall accuracy 44.3% -> 46-48%.
 
-import glob, json, os, shutil, subprocess, sys, time
+import glob
+import json
+import os
+import shutil
+import subprocess
+import sys
+import time
 from pathlib import Path
 
 REPO = 'https://github.com/KJSK-Koushik/Adaptive-reasoning-for-Financial-Advisory-Systems.git'
@@ -81,7 +87,8 @@ print('wall-clock budget: yes | probe guard: yes | per-batch log: yes | stack du
 
 # ── 3. dependencies ──────────────────────────────────────────────────────
 try:
-    import torch, transformers  # noqa: F401
+    import torch  # noqa: F401
+    import transformers  # noqa: F401
     print('dependencies already present')
 except ImportError:
     subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-q',
