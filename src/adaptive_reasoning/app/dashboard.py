@@ -299,8 +299,8 @@ def _results_table(data: dict) -> tuple[str, str]:
     caption = ""
     if "dqn" in data and "fixed_step_matched" in data:
         margin = (data["dqn"]["accuracy"] - data["fixed_step_matched"]["accuracy"]) * 100
-        caption = (f"At the same token budget the RL agent beats the fixed rule by "
-                   f"{margin:.1f} points. The last row is an upper bound, not a method.")
+        caption = f"Same token budget: RL agent +{margin:.1f} points over the fixed rule."
+
     return table, caption
 
 
@@ -329,7 +329,6 @@ def main() -> None:
             "Question", options,
             format_func=lambda q: str(frame.loc[q, "question"])[:60] + " ...",
         )
-        st.caption(f"Showing filings from {MIN_YEAR} onwards.")
 
         st.markdown(_eyebrow("Stopping policy"), unsafe_allow_html=True)
         keys = sorted(store.policies)
@@ -349,7 +348,7 @@ def main() -> None:
     # -- hero ---------------------------------------------------------------- #
     st.markdown(
         '<div class="ar-hero"><div>'
-        + _eyebrow("Adaptive reasoning · Phase 8")
+        + _eyebrow("Adaptive reasoning")
         + f'<h1 class="ar-display-lg">{_h(cfg.app.title)}</h1>'
         + '<p class="ar-lead">The system decides when the model has thought long '
           'enough — and stops it there.</p>'
@@ -382,19 +381,15 @@ def main() -> None:
     if was_right and not full_right:
         st.markdown(
             _card(PINK, _eyebrow("What happened"),
-                  '<div class="ar-title-lg">The model had it, then talked itself out '
-                  'of it.</div>',
-                  '<p class="ar-body">Stopping early got the right answer; thinking '
-                  'longer lost it.</p>'),
+                  '<div class="ar-title-lg">Stopping early got it right. Thinking '
+                  'longer lost it.</div>'),
             unsafe_allow_html=True,
         )
     elif full_right and not was_right:
         st.markdown(
             _card(CANVAS, _eyebrow("What happened"),
-                  '<div class="ar-title-lg">On this question, stopping early was too '
-                  'soon.</div>',
-                  '<p class="ar-body">Full reasoning reached the right answer; the '
-                  'policy stopped before it got there.</p>', hairline=True),
+                  '<div class="ar-title-lg">Stopped too soon on this one.</div>',
+                  hairline=True),
             unsafe_allow_html=True,
         )
 
@@ -402,37 +397,35 @@ def main() -> None:
     a, b, c = st.columns(3, gap="medium")
     with a:
         st.markdown(_metric_card(OCHRE, "Reasoning saved", f"{pct:.0f}%",
-                                 "of the tokens full reasoning used"),
+                                 "vs full reasoning"),
                     unsafe_allow_html=True)
     with b:
         st.markdown(_metric_card(PEACH, "Tokens", f"{adaptive.tokens_used}",
-                                 f"{saved} fewer than full reasoning"),
+                                 f"{saved} fewer"),
                     unsafe_allow_html=True)
     with c:
         st.markdown(_metric_card(CARD, "Time", f"{adaptive.tokens_used / TOKENS_PER_SECOND:.1f}s",
-                                 f"{saved / TOKENS_PER_SECOND:.1f}s faster on a T4 GPU"),
+                                 f"{saved / TOKENS_PER_SECOND:.1f}s faster"),
                     unsafe_allow_html=True)
 
     # -- how it decided ------------------------------------------------------ #
     st.markdown(
         _card(CANVAS, _eyebrow("How it decided"),
-              '<div class="ar-title-md" style="margin-bottom:14px">One decision per '
-              'reasoning step. The highlighted row is where the policy stopped.</div>',
               _decision_table(adaptive.decisions), rounded="lg", hairline=True),
         unsafe_allow_html=True,
     )
 
     # -- everything else, folded away ---------------------------------------- #
     if str(row.context or "").strip():
-        with st.expander("Source document given to the model"):
+        with st.expander("Source document"):
             st.text(str(row.context)[:4000])
 
-    with st.expander("The model's reasoning, step by step"):
+    with st.expander("Model's reasoning"):
         for d in adaptive.decisions:
             st.markdown(f"**Step {d.step_index + 1}**")
             st.text(d.step_text[:800] or "(no text recorded)")
 
-    with st.expander("Overall results on the unseen test questions"):
+    with st.expander("Overall results"):
         import json
 
         from adaptive_reasoning import paths
@@ -444,17 +437,14 @@ def main() -> None:
             n = data.get("dqn", {}).get("n")
             st.markdown(table, unsafe_allow_html=True)
             if caption:
-                st.caption(caption + (f" Measured on {n} questions." if n else ""))
+                st.caption(caption + (f" {n} test questions." if n else ""))
         else:
             st.info("Run scripts/run_phase6.py to fill this in.")
 
     # -- footer: cream, never dark ------------------------------------------- #
     st.markdown(
-        '<div class="ar-footer">' + _eyebrow("About this demonstration")
-        + '<p>Replayed from the Phase 3 recordings through the Phase 7 controller — '
-          'the same code that would drive a live model — so it runs with no GPU. '
-          'Accuracy figures come from the Phase 6 evaluation on the held-out test '
-          'split.</p>'
+        '<div class="ar-footer">'
+        + '<p>Replayed from recorded reasoning traces — no GPU needed.</p>'
         + (f'<p>{_h(adaptive.disclaimer)}</p>' if adaptive.disclaimer else "")
         + '</div>',
         unsafe_allow_html=True,
