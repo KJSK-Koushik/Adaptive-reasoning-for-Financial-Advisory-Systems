@@ -7,13 +7,13 @@
   "stopped_by_cap": 0,
   "feature_max_difference": 0.0,
   "demo": {
-    "question_id": "finqa::C/2009/page_141.pdf-3",
-    "answer": "407 million",
-    "stop_step": 6,
-    "tokens_used": 336,
-    "tokens_available": 461,
-    "token_reduction_pct": 27.1,
+    "question_id": "tatqa::1e6072e9230103dea533b229bbe742e2",
+    "answer": "160,900",
+    "stop_step": 2,
+    "tokens_used": 144,
+    "tokens_available": 560,
+    "token_reduction_pct": 74.3,
     "stop_reason": "policy",
-    "n_decisions": 7
+    "n_decisions": 3
   }
 }

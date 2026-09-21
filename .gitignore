@@ -16,18 +16,29 @@ venv/
 .env
 *.local.yaml
 
-# Data - never commit raw or processed datasets
+# Data - raw downloads (823 MB) and intermediates stay out. The unified dataset and
+# the difficulty labels are committed so Phases 4-9 and the dashboard run from a
+# clone without re-downloading seven sources.
 data/raw/**
 data/interim/**
 data/processed/**
 !data/**/.gitkeep
 !data/**/README.md
+!data/processed/unified.parquet
+!data/processed/difficulty_labels.parquet
 
-# Artifacts - large, regenerable
+# Artifacts - logs and shards stay out. The 4,000 traces (5.5 MB) and the trained
+# policies are committed: they are what every reported number is computed from, and
+# regenerating the traces needs a GPU.
 artifacts/traces/**
 artifacts/models/**
 artifacts/logs/**
 !artifacts/**/.gitkeep
+!artifacts/traces/traces.parquet
+!artifacts/traces/trace_summary.parquet
+!artifacts/models/stopping_policy.pt
+!artifacts/models/behaviour_cloning.joblib
+!artifacts/models/difficulty_clf.joblib
 
 # Results are small and worth keeping, but not the raw plots dump
 artifacts/results/**/*.png

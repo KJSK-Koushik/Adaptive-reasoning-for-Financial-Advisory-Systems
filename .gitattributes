@@ -29,3 +29,5 @@
 *.zip   binary
 *.parquet binary
 *.ipynb binary
+*.pt    binary
+*.joblib binary
