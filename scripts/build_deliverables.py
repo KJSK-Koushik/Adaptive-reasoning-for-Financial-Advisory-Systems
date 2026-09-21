@@ -355,7 +355,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="build deliverables from the results")
     ap.add_argument("--all-complete", action="store_true",
                     help="report phases 8 and 9 as complete")
-    ap.add_argument("--tests", type=int, default=424, help="passing test count to cite")
+    ap.add_argument("--tests", type=int, default=449, help="passing test count to cite")
     ap.add_argument("--docx-only", action="store_true")
     ap.add_argument("--pptx-only", action="store_true")
     args = ap.parse_args()

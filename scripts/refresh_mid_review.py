@@ -320,10 +320,9 @@ def refresh(n_tests: int, code_lines: int, code_files: int) -> Path:
     if "no_state" in abl:
         ns = abl["no_state"]
         best_line = ("What it has learned is to read the model's own signals — confidence and "
-                     "whether the answer has stopped changing — rather than the question's "
-                     f"difficulty. The best configuration is the difficulty-blind one: "
-                     f"{pct(ns['accuracy'])}, {ns['margin_over_fixed'] * 100:+.1f} points over "
-                     "the fixed rule.")
+                     "whether the answer has stopped changing — not the question's difficulty. "
+                     f"Best configuration: difficulty-blind, {pct(ns['accuracy'])} "
+                     f"({ns['margin_over_fixed'] * 100:+.1f} over the fixed rule).")
     else:
         best_line = ("What it has learned is to read the model's own signals — confidence and "
                      "whether the answer has stopped changing — rather than the question's "
