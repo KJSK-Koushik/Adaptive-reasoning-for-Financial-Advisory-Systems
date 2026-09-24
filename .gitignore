@@ -36,6 +36,7 @@ artifacts/logs/**
 !artifacts/**/.gitkeep
 !artifacts/traces/traces.parquet
 !artifacts/traces/trace_summary.parquet
+!artifacts/traces/transitions.parquet
 !artifacts/models/stopping_policy.pt
 !artifacts/models/behaviour_cloning.joblib
 !artifacts/models/difficulty_clf.joblib

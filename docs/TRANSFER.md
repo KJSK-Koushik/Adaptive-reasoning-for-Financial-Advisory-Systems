@@ -10,7 +10,7 @@ What is in the zip
 |---|---|
 | `src/`, `scripts/`, `tests/`, `configs/`, `docs/`, `notebooks/` | the code |
 | `data/processed/unified.parquet`, `difficulty_labels.parquet` | Phase 1-2 output; Phases 4-9 and the app read these |
-| `artifacts/traces/` | the 4,000 GPU-generated traces every number is computed from |
+| `artifacts/traces/` | the 4,000 GPU-generated traces every number is computed from, and the RL transitions built from them |
 | `artifacts/models/` | trained difficulty classifier, DQN policy, behaviour-cloning control |
 | `artifacts/results/` | every phase's summary JSON; the report and deck are built from these |
 | `*.docx`, `*.pptx` | the deliverables |
@@ -77,6 +77,24 @@ want to rerun Phase 1).
 * Different numbers from Phase 6 - the traces or models were not copied; check that
   `artifacts/traces/traces.parquet` is 5.4 MB and `artifacts/models/stopping_policy.pt`
   exists.
-* Kaggle: the API token lives in `%USERPROFILE%\.kaggle\kaggle.json` on the old
-  machine and is deliberately **not** in the zip. Create a new one from the Kaggle
-  account page if the new machine needs to push runs.
+* Kaggle: the API token lives in `%USERPROFILE%\.kaggle\access_token.txt` on the old
+  machine and is deliberately **not** in the zip. It is only needed to push Kaggle runs
+  from the command line; create a new token on the Kaggle account page (Settings → API)
+  on the new machine rather than copying the old one. Running the notebook through the
+  Kaggle website needs no token at all.
+* GitHub and git: the zip carries the full history but no login. To commit or push from
+  the new machine, set `git config --global user.name` / `user.email` and sign in with
+  `gh auth login`.
+
+## Models downloaded on first use
+
+These come from Hugging Face automatically the first time they are needed, so the new
+machine needs internet for its first `pytest` and its first Phase 4 run:
+
+| Model | Size | Needed by |
+|---|---|---|
+| `sentence-transformers/all-MiniLM-L6-v2` | ~90 MB | difficulty classifier - Phases 2, 4 and 9 |
+| `Qwen/Qwen2.5-0.5B-Instruct` | ~1 GB | the trace-generator tests |
+| `deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B` | ~3.5 GB | only the pilot and Phase 3, which run on Kaggle |
+
+The dashboard, Phases 5-8 and the results need none of them.
