@@ -66,3 +66,6 @@ phase3_results.zip
 *.docx
 
 .coverage
+
+# Local editor/tool settings
+.claude/
